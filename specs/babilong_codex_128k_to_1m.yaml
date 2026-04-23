@@ -1,0 +1,131 @@
+# Reviewable experiment plan for the Codex × BABILong compaction sweep.
+#
+# This is the main reviewable experiment spec for Codex on BABILong.
+# The sweep intentionally starts at 128k, not 4k, because the goal is to test
+# compaction pressure rather than easy short-context behavior.
+#
+# Key decisions:
+# - Floor the main sweep at 128k because gpt-5.3-codex-spark reports a 128k
+#   context window and higher-end Codex models report 272k.
+# - Do NOT rely on Codex's implicit default auto-compaction threshold.
+# - Pin `auto_compact_limit: 150000` because the real 1M BABILong smoke run
+#   showed that plain default-auto did not rescue the run, while an explicit
+#   lower threshold made auto mode tractable.
+
+experiment:
+  name: babilong_codex_128k_to_1m
+  objective: >-
+    Measure how Codex behaves on BABILong as context length grows from 128k to 1M
+    under compaction off vs auto, using direct multi-turn injection.
+
+benchmark:
+  source_benchmark: babilong
+  dataset_name: RMT-team/babilong
+  source: huggingface
+  lengths:
+    - 128k
+    - 256k
+    - 512k
+    - 1M
+  tasks:
+    - qa1
+    - qa2
+    - qa3
+    - qa4
+    - qa5
+    - qa6
+    - qa7
+    - qa8
+    - qa9
+    - qa10
+  samples_per_split: 1
+  notes:
+    - Use RMT-team/babilong, not RMT-team/babilong-1k-samples, because 1k-samples does not provide 1M splits.
+    - qa8 is set-valued and should use csv_set_ci scoring.
+    - 128k is the minimum sweep length because shorter lengths are not the main compaction target.
+
+runner:
+  harness: codex
+  model: gpt-5.4-mini
+  conditions:
+    - off
+    - auto
+  timeout_s: 240
+  chunk_tokens_by_length:
+    128k: 16000
+    256k: 32000
+    512k: 64000
+    1M: 100000
+  codex:
+    web_search: disabled
+    reasoning_effort: high
+    verbosity: low
+    off_compact_limit: 2000000000
+    auto_compact_limit: 150000
+  rationale:
+    - Start the main sweep at 128k because that is the lower relevant context regime for the Codex models we care about.
+    - Increase chunk size with context length so the 1M tasks do not explode into hundreds of turns.
+    - 100000 chunk tokens gave a tractable real 1M BABILong Codex smoke run.
+    - auto_compact_limit 150000 was the explicit threshold that let the real 1M Codex run complete.
+    - Pin reasoning_effort to high across models so the sweep uses one explicit, reviewable reasoning regime instead of mixed model defaults.
+
+outputs:
+  prepared_tasks_dir: data/benchmarks/babilong_codex_128k_to_1m
+  runs_dir: artifacts/runs_direct_babilong_codex_128k_to_1m
+  results_dir: artifacts/results_babilong_codex_128k_to_1m
+
+interpretation:
+  main_metric: clean accuracy
+  secondary_metrics:
+    - parse_ok_rate
+    - contaminated_rate
+    - error_rate
+    - average_duration_s
+  expectations:
+    - off should increasingly fail or degrade at large lengths
+    - auto should survive larger contexts more often than off
+    - answer quality may still degrade even when auto completes
+
+notes:
+  model_defaults:
+    codex_auto_threshold: >-
+      Codex exposes `model_auto_compact_token_limit`, but when it is unset the
+      docs only say it uses model defaults. We do NOT have a documented numeric
+      default threshold from OpenAI/Codex.
+    codex_known_model_metadata:
+      gpt-5.4:
+        context_window: 272000
+        truncation_policy:
+          mode: tokens
+          limit: 10000
+        default_reasoning_level: xhigh
+      gpt-5.4-mini:
+        context_window: 272000
+        truncation_policy:
+          mode: tokens
+          limit: 10000
+        default_reasoning_level: medium
+      gpt-5.3-codex:
+        context_window: 272000
+        truncation_policy:
+          mode: tokens
+          limit: 10000
+        default_reasoning_level: medium
+      gpt-5.3-codex-spark:
+        context_window: 128000
+        truncation_policy:
+          mode: tokens
+          limit: 10000
+        default_reasoning_level: high
+  default_compaction_window_in_code:
+    codex_auto: >-
+      In the current code, Codex auto mode does NOT pin a threshold by default.
+      If auto_compact_limit is not supplied, the runner relies on the model's own default behavior.
+    codex_off: >-
+      In the current code, off mode explicitly sets model_auto_compact_token_limit to 2000000000.
+  recommendation:
+    - Do not treat the hidden Codex model default as a reviewable benchmark setting.
+    - Use the explicit threshold in this experiment config so the run is reproducible and reviewable.
+  claude_note:
+    - Strict Claude benchmark mode still requires bare-mode-compatible auth.
+    - OAuth-only Claude should be treated as dev/manual mode, not strict benchmark mode.

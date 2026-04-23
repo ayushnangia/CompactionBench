@@ -1,0 +1,2 @@
+{"target": "bathroom", "question": "Where is Mary?", "input": "Mary went to the bathroom. John moved to the kitchen. Sandra travelled to the garden.", "id": "qa1_0001", "task": "qa1", "length": "1M"}
+{"target": "office", "question": "Where is Daniel?", "input": "Daniel journeyed to the office. Mary went to the bedroom. John walked to the hallway.", "id": "qa1_0002", "task": "qa1", "length": "1M"}

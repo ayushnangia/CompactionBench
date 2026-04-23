@@ -1,0 +1,74 @@
+# Reviewable experiment plan for the Codex × OOLONG-synth auto-compaction sweep.
+#
+# This complements BABILong by stressing long-context aggregation rather than
+# exact symbolic single-answer recall.
+
+experiment:
+  name: oolong_synth_codex_auto_high_models
+  objective: >-
+    Run Codex on long OOLONG-synth task groups at 128k to 1M using the same
+    explicit auto-compaction settings as the BABILong runs, so we can compare
+    exact-fact retention against aggregation-heavy long-context reasoning.
+
+benchmark:
+  source_benchmark: oolong
+  dataset_name: oolongbench/oolong-synth
+  prepared_tasks_dir: data/benchmarks/oolong_synth_codex_128k_to_1m_s3
+  prepared_file_template: oolong_synth_{task}_{length}.jsonl
+  prepared_file_sample_glob: oolong_synth_{task}_{length}_*.jsonl
+  lengths:
+    - 128k
+    - 256k
+    - 512k
+    - 1M
+  tasks:
+    - counting
+    - user
+    - timeline
+  samples_per_split: 3
+  notes:
+    - One-row-per-file prepared tasks generated from oolongbench/oolong-synth.
+    - Standard context variant uses context_window_text without gold labels.
+    - Task groups map to counting, user-specific aggregation, and temporal aggregation.
+
+runner:
+  harness: codex
+  models:
+    - gpt-5.4
+    - gpt-5.4-mini
+    - gpt-5.3-codex
+  conditions:
+    - auto
+  max_parallel_jobs: 8
+  timeout_s: 240
+  chunk_tokens_by_length:
+    128k: 16000
+    256k: 32000
+    512k: 64000
+    1M: 100000
+  codex:
+    web_search: disabled
+    reasoning_effort: high
+    verbosity: low
+    auto_compact_limit: 150000
+    sandbox_mode: read-only
+    approval_policy: never
+    add_dirs: []
+    unique_temp_workdir_per_run: true
+  rationale:
+    - Mirrors the BABILong Codex settings so model-to-model comparisons stay apples-to-apples.
+    - Focuses on long context lengths where compaction pressure is actually present.
+    - Keeps task groups explicit for later breakdown by counting/user/timeline failures.
+
+outputs:
+  root_dir: artifacts/batches/oolong_synth_codex_auto_high_models
+  saves:
+    - copied spec yaml
+    - task inventory csv/json
+    - job manifest csv/json
+    - per-job logs
+    - per-job result summary csv/json
+    - per-run JSON artifacts
+    - scored csv/json outputs
+    - text report
+    - batch status json

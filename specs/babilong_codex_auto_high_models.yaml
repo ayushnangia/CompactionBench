@@ -1,0 +1,98 @@
+# Reviewable experiment plan for the Codex × BABILong auto-compaction sweep.
+#
+# This is the human-review spec for the background run we are launching.
+# It uses only auto mode because real 1M BABILong evidence already showed that
+# off mode simply runs out of room and dies.
+
+experiment:
+  name: babilong_codex_auto_high_models
+  objective: >-
+    Run Codex on BABILong from 128k to 1M with auto compaction only, using a
+    fixed high reasoning regime across models and saving all artifacts for later
+    human review.
+
+benchmark:
+  source_benchmark: babilong
+  dataset_name: RMT-team/babilong
+  prepared_tasks_dir: data/benchmarks/babilong_codex_128k_to_1m
+  lengths:
+    - 128k
+    - 256k
+    - 512k
+    - 1M
+  tasks:
+    - qa1
+    - qa2
+    - qa3
+    - qa4
+    - qa5
+    - qa6
+    - qa7
+    - qa8
+    - qa9
+    - qa10
+  samples_per_split: 1
+  notes:
+    - The 40 prepared JSONL files already exist locally.
+    - qa8 uses csv_set_ci scoring.
+
+runner:
+  harness: codex
+  models:
+    - gpt-5.4
+    - gpt-5.4-mini
+    - gpt-5.3-codex
+  conditions:
+    - auto
+  max_parallel_jobs: 8
+  timeout_s: 240
+  chunk_tokens_by_length:
+    128k: 16000
+    256k: 32000
+    512k: 64000
+    1M: 100000
+  codex:
+    web_search: disabled
+    reasoning_effort: high
+    verbosity: low
+    auto_compact_limit: 150000
+    sandbox_mode: read-only
+    approval_policy: never
+    add_dirs: []
+    unique_temp_workdir_per_run: true
+  rationale:
+    - Start at 128k because shorter lengths are not the main compaction target.
+    - Use one explicit high reasoning regime across models instead of mixed defaults.
+    - Pin auto_compact_limit to 150000 because hidden model defaults are not a reviewable benchmark setting.
+    - Exclude off mode because prior real 1M BABILong evidence showed deterministic context-window failure.
+    - Use 8-way concurrency for throughput, but keep per-job Codex sandboxing fixed and isolated.
+
+outputs:
+  root_dir: artifacts/batches/babilong_codex_auto_high_models
+  saves:
+    - copied spec yaml
+    - task inventory csv/json
+    - job manifest csv/json
+    - per-job logs
+    - per-job result summary csv/json
+    - per-run JSON artifacts
+    - scored csv/json outputs
+    - text report
+    - batch status json
+    - pid file
+
+review_notes:
+  known_model_metadata:
+    gpt-5.4:
+      context_window: 272000
+      default_reasoning_level: xhigh
+    gpt-5.4-mini:
+      context_window: 272000
+      default_reasoning_level: medium
+    gpt-5.3-codex:
+      context_window: 272000
+      default_reasoning_level: medium
+  human_questions:
+    - Does high reasoning improve BABILong answer quality enough to justify the extra runtime?
+    - Do failures cluster by task type or by length?
+    - Is explicit auto compaction enough, or do some tasks still fail systematically at 1M?

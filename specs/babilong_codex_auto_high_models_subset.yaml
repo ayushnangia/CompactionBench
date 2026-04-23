@@ -1,0 +1,49 @@
+# Small validation subset for the parallel Codex × BABILong runner.
+#
+# Purpose:
+# - validate the orchestration, artifact layout, and scoring pipeline
+# - get representative signal before relaunching the full sweep
+
+experiment:
+  name: babilong_codex_auto_high_models_subset
+  objective: >-
+    Run a small representative Codex × BABILong subset with the same settings
+    as the full planned sweep, then use that result to decide how to resume the
+    larger matrix.
+
+benchmark:
+  source_benchmark: babilong
+  dataset_name: RMT-team/babilong
+  prepared_tasks_dir: data/benchmarks/babilong_codex_128k_to_1m
+  lengths:
+    - 128k
+    - 1M
+  tasks:
+    - qa1
+    - qa5
+  samples_per_split: 1
+
+runner:
+  harness: codex
+  models:
+    - gpt-5.4-mini
+    - gpt-5.3-codex
+  conditions:
+    - auto
+  max_parallel_jobs: 4
+  timeout_s: 240
+  chunk_tokens_by_length:
+    128k: 16000
+    1M: 100000
+  codex:
+    web_search: disabled
+    reasoning_effort: high
+    verbosity: low
+    auto_compact_limit: 150000
+    sandbox_mode: read-only
+    approval_policy: never
+    add_dirs: []
+    unique_temp_workdir_per_run: true
+
+outputs:
+  root_dir: artifacts/batches/babilong_codex_auto_high_models_subset

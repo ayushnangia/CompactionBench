@@ -1,0 +1,66 @@
+# Diagnostic Codex × BABILong sweep for missing reasoning families.
+#
+# Upstream `RMT-team/babilong` only exposes qa11-qa20 at config `0k`, so the
+# prepared task files in this sweep are constructed by embedding those real 0k
+# tasks into cleaned long BABILong carrier contexts from qa1-qa10.
+
+experiment:
+  name: babilong_codex_auto_high_models_qa11_to_20_s3
+  objective: >-
+    Extend the Codex BABILong insight sweep to qa11-qa20 with multiple samples
+    per split, keeping the same reviewed Codex settings while covering the
+    missing reasoning families: coreference, time reasoning, deduction,
+    induction, positional reasoning, path finding, and motivations.
+
+benchmark:
+  source_benchmark: babilong
+  dataset_name: RMT-team/babilong
+  prepared_tasks_dir: data/benchmarks/babilong_codex_qa11_to_20_128k_to_1m_s3
+  lengths:
+    - 128k
+    - 256k
+    - 512k
+    - 1M
+  tasks:
+    - qa11
+    - qa12
+    - qa13
+    - qa14
+    - qa15
+    - qa16
+    - qa17
+    - qa18
+    - qa19
+    - qa20
+  samples_per_split: 3
+  notes:
+    - Prepared files are one-row-per-file with an index suffix.
+    - Long contexts are constructed from real 0k task rows plus cleaned long BABILong carriers.
+
+runner:
+  harness: codex
+  models:
+    - gpt-5.4
+    - gpt-5.4-mini
+    - gpt-5.3-codex
+  conditions:
+    - auto
+  max_parallel_jobs: 8
+  timeout_s: 240
+  chunk_tokens_by_length:
+    128k: 16000
+    256k: 32000
+    512k: 64000
+    1M: 100000
+  codex:
+    web_search: disabled
+    reasoning_effort: high
+    verbosity: low
+    auto_compact_limit: 150000
+    sandbox_mode: read-only
+    approval_policy: never
+    add_dirs: []
+    unique_temp_workdir_per_run: true
+
+outputs:
+  root_dir: artifacts/batches/babilong_codex_auto_high_models_qa11_to_20_s3
