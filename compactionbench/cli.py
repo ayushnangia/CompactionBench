@@ -22,6 +22,8 @@ from .loaders import (
     prepare_ruler_tasks,
     write_prepared_tasks,
 )
+from .tasks import generate_all_synthetic_tasks
+from .compression import compress_task_row, normalize_policy_name
 from .judge import judge_runs
 from .run import load_tasks, run_claude_code_tasks, run_codex_tasks
 from .score import format_report, score_runs
@@ -255,6 +257,51 @@ def run_codex(
         verbosity=verbosity,
     )
     typer.echo(f"Wrote {len(written)} Codex run records under {out}")
+
+
+@prepare_app.command("synth")
+def prepare_synth(
+    out: Path = typer.Option(Path("data/benchmarks/synthetic_tasks.jsonl"), help="Output JSONL for validated synthetic task rows."),
+    count: int = typer.Option(5, "--count", help="Number of tasks per synthetic task type."),
+    filler_sentences: int = typer.Option(200, "--filler-sentences", help="Number of filler sentences to pad the context."),
+    seed: int = typer.Option(0, "--seed", help="Random seed for reproducibility."),
+) -> None:
+    rows = generate_all_synthetic_tasks(
+        count_per_type=count,
+        filler_sentences=filler_sentences,
+        seed=seed,
+    )
+    write_prepared_tasks(rows, out)
+    typer.echo(f"Wrote {len(rows)} synthetic task rows to {out}")
+
+
+@app.command("compress")
+def compress(
+    tasks: list[Path] = typer.Option(..., "--tasks", exists=True, readable=True, help="Task JSONL file(s) or directories containing task JSONL files."),
+    out: Path = typer.Option(Path("data/benchmarks/compressed_tasks.jsonl"), help="Output JSONL for compressed task rows."),
+    policy: str = typer.Option("entropy-notebook", "--policy", help="Compression policy: none, static-notebook, or entropy-notebook."),
+    budget_tokens: int = typer.Option(20_000, "--budget-tokens", min=1, help="Approximate token budget for compressed context."),
+    query_aware: bool = typer.Option(False, "--query-aware", help="Allow the compressor to see the final question."),
+    task_id: list[str] = typer.Option(None, "--task-id", help="Optional task_id allowlist; repeat for multiple."),
+) -> None:
+    normalized_policy = normalize_policy_name(policy)
+    loaded = load_tasks(tasks, task_filter=set(task_id) if task_id else None)
+    rows = [
+        compress_task_row(
+            row,
+            policy=normalized_policy,
+            budget_tokens=budget_tokens,
+            query_aware=query_aware,
+        )
+        for row in loaded
+    ]
+    write_prepared_tasks(rows, out)
+    ratios = [row.metadata["compression"]["compression_ratio"] for row in rows]
+    avg_ratio = sum(ratios) / len(ratios) if ratios else 0.0
+    typer.echo(
+        f"Wrote {len(rows)} compressed task rows to {out} "
+        f"(policy={normalized_policy}, query_aware={query_aware}, avg_ratio={avg_ratio:.3f})"
+    )
 
 
 @app.command()

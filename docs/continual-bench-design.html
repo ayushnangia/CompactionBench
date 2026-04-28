@@ -1,0 +1,1113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CompactionBench / ContinualBENCH — Design Doc</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --panel: #ffffff;
+    --ink: #1b1b1b;
+    --muted: #5c5c5c;
+    --accent: #2a4d8f;
+    --accent-soft: #eaf0fb;
+    --border: #e4e1d8;
+    --warn: #8a5a00;
+    --warn-soft: #fff4dd;
+    --ok: #1f6b3a;
+    --ok-soft: #e4f2e8;
+    --bad: #8a1d1d;
+    --bad-soft: #fbe6e6;
+    --code-bg: #f3f1ec;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--ink);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 32px 24px 96px; }
+  header.hero {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 20px; margin-bottom: 28px;
+  }
+  header.hero h1 { margin: 0 0 6px; font-size: 30px; letter-spacing: -0.01em; }
+  header.hero .sub { color: var(--muted); font-size: 14px; }
+  header.hero .meta {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px;
+  }
+  .tag {
+    display: inline-block;
+    padding: 2px 8px; border-radius: 4px;
+    background: var(--accent-soft); color: var(--accent);
+    font-size: 12px; font-weight: 600;
+    border: 1px solid #d7e1f2;
+  }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); border-color: #eedbaa; }
+  .tag.ok   { background: var(--ok-soft);   color: var(--ok);   border-color: #bfd8c8; }
+  .tag.bad  { background: var(--bad-soft);  color: var(--bad);  border-color: #e4bcbc; }
+  h2 {
+    margin: 38px 0 12px; font-size: 22px;
+    border-bottom: 1px solid var(--border); padding-bottom: 6px;
+  }
+  h3 { margin: 22px 0 8px; font-size: 17px; }
+  h4 { margin: 16px 0 6px; font-size: 15px; color: var(--accent); }
+  p  { margin: 8px 0 10px; }
+  ul, ol { margin: 6px 0 12px; padding-left: 22px; }
+  li { margin: 3px 0; }
+  code {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 13px; background: var(--code-bg);
+    padding: 1px 5px; border-radius: 3px;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12.5px; line-height: 1.5;
+  }
+  table {
+    width: 100%; border-collapse: collapse;
+    margin: 10px 0 18px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+  }
+  th, td {
+    text-align: left; vertical-align: top;
+    padding: 8px 10px; border-bottom: 1px solid var(--border);
+    font-size: 13.5px;
+  }
+  th { background: #f3efe6; font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px 18px; margin: 14px 0;
+  }
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 10px 14px; margin: 12px 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 14px;
+  }
+  .callout.warn { border-color: var(--warn); background: var(--warn-soft); }
+  .callout.bad  { border-color: var(--bad);  background: var(--bad-soft); }
+  .grid2 {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+  }
+  .grid3 {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px;
+  }
+  @media (max-width: 760px) {
+    .grid2, .grid3 { grid-template-columns: 1fr; }
+  }
+  nav.toc {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; padding: 12px 16px; margin-bottom: 24px;
+    font-size: 14px;
+  }
+  nav.toc ol { margin: 6px 0 0 18px; padding: 0; }
+  nav.toc a { color: var(--accent); text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+  .metric {
+    display: inline-block; min-width: 90px;
+    padding: 8px 10px; margin: 4px 6px 4px 0;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  .metric .n { font-size: 18px; font-weight: 700; display: block; }
+  .metric .l { font-size: 12px; color: var(--muted); }
+  footer {
+    margin-top: 40px; border-top: 1px solid var(--border);
+    padding-top: 16px; color: var(--muted); font-size: 12.5px;
+  }
+  .fpath { color: var(--muted); font-size: 12px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+  hr.soft { border: none; border-top: 1px dashed var(--border); margin: 18px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>CompactionBench — Design Document</h1>
+  <div class="sub">
+    A small, deliberately boring benchmark that asks one question:
+    <em>when an agent harness has to compact its own context, does it keep the right facts?</em>
+  </div>
+  <div class="meta">
+    <span class="tag">Repository: CompactionBench</span>
+    <span class="tag">Branch: main</span>
+    <span class="tag">Snapshot date: 2026-04-23</span>
+    <span class="tag warn">Status: active — 4th sweep in prep</span>
+    <span class="tag">Umbrella framing: ContinualBENCH</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <strong>Table of contents</strong>
+  <ol>
+    <li><a href="#motivation">1. Motivation and research question</a></li>
+    <li><a href="#pipeline">2. End-to-end pipeline</a></li>
+    <li><a href="#schema">3. Data schema (Pydantic)</a></li>
+    <li><a href="#loaders">4. Loaders &mdash; upstream benchmarks</a></li>
+    <li><a href="#chunking">5. Context chunking</a></li>
+    <li><a href="#runners">6. Harness runners (Claude Code &amp; Codex)</a></li>
+    <li><a href="#scorers">7. Scoring (deterministic + judge)</a></li>
+    <li><a href="#specs">8. Reviewable experiment specs</a></li>
+    <li><a href="#results">9. Results so far</a></li>
+    <li><a href="#current">10. What is happening right now</a></li>
+    <li><a href="#sprint">11. Exploration sprint &mdash; tiny notebook</a></li>
+    <li><a href="#layout">12. Repository layout</a></li>
+    <li><a href="#caveats">13. Caveats, guardrails, open questions</a></li>
+  </ol>
+</nav>
+
+<!-- =============================================================== -->
+<h2 id="motivation">1. Motivation and research question</h2>
+
+<p>
+Modern agent harnesses (Claude Code, Codex CLI, etc.) advertise very large
+context windows, but they also quietly <em>compact</em> their own history when
+those windows fill up. Compaction is not a benign summarisation: it can
+silently drop the exact fact, the latest correction, or the specific binding
+that an answer depends on.
+</p>
+
+<div class="callout">
+  <strong>Core question.</strong>
+  If a long benchmark context is injected into an agentic coding harness over
+  many chat turns, does the harness still preserve the right facts when
+  compaction is <code>off</code> vs <code>auto</code>?
+</div>
+
+<h3>Why this framing</h3>
+<ul>
+  <li><strong>System-level, not model-level.</strong> We evaluate the whole
+    harness (model + scheduler + compaction rule + tool policy), not just the
+    raw LM. That matches how real agents are actually used.</li>
+  <li><strong>Operational, not theoretical.</strong> Tasks are driven through
+    the live CLI as subprocesses. The answer the CLI emits is the answer we
+    grade &mdash; no hidden retrieval, no API-only shortcut.</li>
+  <li><strong>Honest failure mode for tools.</strong> Any tool call at all
+    flips <code>contaminated_by_tools=True</code> and removes that run from the
+    clean metric. The benchmark refuses to credit answers the model could have
+    obtained by reading files, searching, or browsing.</li>
+</ul>
+
+<h3>Two factual conditions</h3>
+<table>
+  <tr><th>Condition</th><th>Meaning</th><th>How it&rsquo;s set</th></tr>
+  <tr>
+    <td><code>off</code></td>
+    <td>Harness should not compact. Any compaction event is a finding.</td>
+    <td>Claude: <code>DISABLE_AUTOCOMPACT=1</code>. Codex:
+        <code>model_auto_compact_token_limit=2&nbsp;000&nbsp;000&nbsp;000</code>.</td>
+  </tr>
+  <tr>
+    <td><code>auto</code></td>
+    <td>Harness compacts as it sees fit. We log every event.</td>
+    <td>Claude: default. Codex: explicit threshold
+        (typically <code>150&nbsp;000</code>) rather than model default.</td>
+  </tr>
+</table>
+
+<div class="callout warn">
+  <strong>Why we pin Codex&rsquo;s auto-compact threshold.</strong>
+  Codex documents <code>model_auto_compact_token_limit</code> but says that
+  when unset it &ldquo;uses model defaults.&rdquo; Those defaults are not
+  documented as a number. For benchmark reproducibility we refuse to rely on
+  hidden defaults; every serious sweep pins an explicit threshold.
+</div>
+
+<h3>Why the contexts must be huge</h3>
+<ul>
+  <li>Claude Code Sonnet-family models in this env report ~<strong>200k</strong> context.</li>
+  <li>Codex local metadata reports <strong>272k</strong> for
+      <code>gpt-5.4</code>, <code>gpt-5.4-mini</code>, <code>gpt-5.3-codex</code>,
+      and <strong>128k</strong> for <code>gpt-5.3-codex-spark</code>.</li>
+  <li>Therefore the main evaluation target is <strong>1M+ context</strong> &mdash;
+      not 100k &mdash; because the whole point is to force harness compaction
+      to become load-bearing.</li>
+</ul>
+
+<!-- =============================================================== -->
+<h2 id="pipeline">2. End-to-end pipeline</h2>
+
+<p>
+The flow is deliberately simple. Every stage is a sub-command of
+<code>cbench</code> (the Typer CLI in <span class="fpath">compactionbench/cli.py</span>).
+</p>
+
+<pre>
+    upstream dataset (HF / JSONL)
+              │
+              ▼
+      ┌────────────────────┐
+      │  cbench prepare    │   validates + writes one JSONL row per task
+      │  (loaders.py)      │   schema: TaskRow  (Pydantic, extra="forbid")
+      └────────────────────┘
+              │
+              ▼
+      ┌────────────────────┐
+      │  cbench run …      │   chunks context, drives claude/codex CLI
+      │  (run.py)          │   one subprocess per turn, same session-id
+      └────────────────────┘
+              │
+              ▼
+      artifacts/runs_direct/&lt;harness&gt;/&lt;model&gt;/&lt;condition&gt;/&lt;task&gt;.json
+              │
+              ▼
+      ┌────────────────────┐
+      │  cbench score      │   deterministic scorers per-row
+      │  (score.py)        │   rows.csv + summary.{csv,json}
+      └────────────────────┘
+              │
+              ▼
+      ┌────────────────────┐
+      │  cbench judge      │   optional LLM-as-judge pass
+      │  (judge.py)        │   only for borderline deterministic failures
+      └────────────────────┘
+              │
+              ▼
+      ┌────────────────────┐
+      │  cbench report     │   pretty-prints summary.json
+      └────────────────────┘
+</pre>
+
+<h3>What the run artifact actually contains</h3>
+<ul>
+  <li>Task identity and benchmark metadata</li>
+  <li>Harness, model, condition</li>
+  <li>Chunking stats (<code>chunk_tokens</code>, <code>chunk_count</code>, <code>context_tokens_est</code>)</li>
+  <li>Compact per-turn traces (role, kind, char/token count, 400-char preview)</li>
+  <li>All tool events (any tool event means the run is contaminated)</li>
+  <li>All compaction events (before/after tokens when the harness reports them)</li>
+  <li>Raw final answer text + the parsed <code>{ "answer": "..." }</code> JSON</li>
+  <li><code>parse_ok</code>, <code>correct</code>, <code>contaminated_by_tools</code>,
+      <code>error</code>, <code>duration_s</code></li>
+</ul>
+
+<div class="callout">
+  <strong>Lean by design.</strong> Run artifacts do <em>not</em> duplicate the
+  full context &mdash; only a 400-char preview per turn. The task JSONL is the
+  canonical source for the long text, artifacts are the operational log.
+</div>
+
+<!-- =============================================================== -->
+<h2 id="schema">3. Data schema (Pydantic)</h2>
+
+<p class="fpath">compactionbench/schema.py</p>
+
+<p>
+All task rows and all run artifacts are validated by Pydantic models with
+<code>extra="forbid"</code>. Nothing unknown sneaks in. The literal types act
+as an allowlist for source benchmarks and scorers.
+</p>
+
+<h4>TaskRow (one JSONL line per sample)</h4>
+<table>
+<tr><th>Field</th><th>Constraint</th><th>Meaning</th></tr>
+<tr><td><code>task_id</code></td><td>regex <code>^[A-Za-z0-9._:-]+$</code>, unique per file</td><td>Stable id, used for artifact filenames.</td></tr>
+<tr><td><code>source_benchmark</code></td><td>one of <code>ruler</code>, <code>babilong</code>, <code>longbench_v2</code>, <code>oolong</code></td><td>Fixed allowlist.</td></tr>
+<tr><td><code>source_task</code></td><td>1&ndash;200 chars</td><td>e.g. <code>qa1</code>, <code>niah_single_1</code>, <code>counting</code>, <code>multidoc_rolls</code>.</td></tr>
+<tr><td><code>source_sample_id</code></td><td>1&ndash;200 chars</td><td>Upstream sample id, for provenance.</td></tr>
+<tr><td><code>context</code></td><td>min 1 char</td><td>The raw long text. Can be millions of characters.</td></tr>
+<tr><td><code>question</code></td><td>1&ndash;20 000 chars</td><td>Asked once at the end.</td></tr>
+<tr><td><code>gold_answer</code></td><td>1&ndash;4000 chars</td><td>Primary correct answer.</td></tr>
+<tr><td><code>gold_answer_aliases</code></td><td>list[str]</td><td>Acceptable alternatives &mdash; scorer takes max over all.</td></tr>
+<tr><td><code>scorer</code></td><td>Literal (see below)</td><td>Chooses the deterministic scoring function.</td></tr>
+<tr><td><code>metadata</code></td><td>dict</td><td>Provenance: dataset name, split, config, length label, episodes, etc.</td></tr>
+</table>
+
+<h4>Run-side models</h4>
+<ul>
+  <li><code>TurnTrace</code> &mdash; one prompt or reply step with
+      <code>role</code> (user/assistant/tool) and
+      <code>kind</code> (context_chunk / final_question / other).</li>
+  <li><code>ToolEvent</code> &mdash; any tool call. Presence alone sets
+      <code>contaminated_by_tools</code>.</li>
+  <li><code>CompactionEvent</code> &mdash; logged with
+      <code>before_tokens</code>/<code>after_tokens</code> when the harness
+      reports them.</li>
+  <li><code>AgentAnswer</code> &mdash; exactly <code>{ "answer": "..." }</code>,
+      extracted by <code>parse_agent_answer()</code> which walks back from the
+      last <code>}</code> to find the balanced JSON block.</li>
+  <li><code>RunRecord</code> &mdash; the top-level artifact.</li>
+</ul>
+
+<h4>Scorers</h4>
+<p>Eleven scorers, one literal type:</p>
+<pre>exact, exact_ci, substring_ci, multiple_choice, csv_set_ci,
+numeric_075, csv_overlap_ci, oolong_text_ci, oolong_comparison_ci,
+date_ci, month_year_ci</pre>
+
+<!-- =============================================================== -->
+<h2 id="loaders">4. Loaders &mdash; upstream benchmarks</h2>
+
+<p class="fpath">compactionbench/loaders.py</p>
+
+<p>
+Each supported benchmark has a <em>from-file</em> loader (local JSONL) and a
+<em>from-HF</em> loader (parquet over Hugging Face&rsquo;s datasets API). Both
+emit the same <code>TaskRow</code> type and both validate every row before
+writing.
+</p>
+
+<h3>RULER</h3>
+<ul>
+  <li>Clean synthetic retrieval-style long-context stress tests.</li>
+  <li>Task-to-question/scorer map hard-coded in <code>RULER_TASK_CONFIG</code>.</li>
+  <li>Covered: NIAH single/multikey/multivalue/multiquery, variable tracking, common/frequent words, doc-grounded QA.</li>
+  <li>Default <code>min_length=1_000_000</code> &mdash; we only keep the 1M variants.</li>
+</ul>
+
+<h3>BABILong</h3>
+<ul>
+  <li>Canonical dataset: <code>RMT-team/babilong</code>
+      (<em>not</em> <code>RMT-team/babilong-1k-samples</code>, which has no 1M split).</li>
+  <li>Pilot range: <code>qa1</code>&ndash;<code>qa5</code>.</li>
+  <li>Extended range: <code>qa6</code>&ndash;<code>qa20</code> &mdash; adds
+      coreference, time reasoning, deduction/induction, positional reasoning,
+      path finding, motivations.</li>
+  <li><strong>qa8 is a special case:</strong> answers are comma-separated
+      sets like <code>apple,football</code>, so it uses the set-aware
+      <code>csv_set_ci</code> scorer instead of exact string match.</li>
+  <li>Main Codex sweep starts at <strong>128k</strong>, not 4k, because
+      compaction only becomes load-bearing above ~128k.</li>
+</ul>
+
+<h3>OOLONG-synth</h3>
+<ul>
+  <li>Clean verifiable aggregation tasks with explicit context-length buckets.</li>
+  <li>Task groups used: <code>counting</code>, <code>user</code>,
+      <code>timeline</code>.</li>
+  <li>Scorer inference is structural &mdash; numeric, date, month-year,
+      comparison, and CSV variants all have dedicated normalisers in
+      <code>score.py</code>.</li>
+</ul>
+
+<h3>OOLONG-real</h3>
+<ul>
+  <li>Real multi-episode transcripts &mdash; currently the D&amp;D (<code>dnd</code>) config.</li>
+  <li>Prefers episode-count buckets (<code>3ep</code>, <code>6ep</code>, <code>10ep</code>, <code>16ep</code>)
+      over pretending tokens are exactly a power of two.</li>
+  <li>Approximate scales:
+      <code>3ep&nbsp;&approx;&nbsp;129k</code>,
+      <code>6ep&nbsp;&approx;&nbsp;298k</code>,
+      <code>10ep&nbsp;&approx;&nbsp;458k</code>,
+      <code>16ep&nbsp;&approx;&nbsp;773k</code>.</li>
+  <li>Questions go through <code>_parse_oolong_real_gold</code> which picks the
+      right scorer (<code>oolong_text_ci</code>, <code>oolong_comparison_ci</code>,
+      <code>date_ci</code>, <code>month_year_ci</code>, <code>numeric_075</code>,
+      <code>csv_overlap_ci</code>).</li>
+</ul>
+
+<div class="callout">
+  <strong>Resilient HF paging.</strong> The loaders use a
+  <code>_read_hf_rows_page_resilient</code> helper that handles
+  <code>IncompleteRead</code> and retries with smaller pages, so a transient
+  Hugging Face hiccup doesn&rsquo;t kill a preparation run mid-sweep.
+</div>
+
+<!-- =============================================================== -->
+<h2 id="chunking">5. Context chunking</h2>
+
+<p class="fpath">compactionbench/chunking.py</p>
+
+<p>
+Chunking is intentionally minimal. The design goal is <strong>fidelity</strong>:
+the emitted chunks, concatenated, should be byte-identical to the original
+context wherever possible.
+</p>
+
+<ul>
+  <li><code>CHARS_PER_TOKEN = 4</code> &mdash; the universal rough conversion.</li>
+  <li><code>MAX_CHUNK_OVERFLOW = 1.2</code> &mdash; a paragraph up to 20% over
+      target size is kept intact rather than split.</li>
+  <li>Paragraph boundaries are matched by <code>re.compile(r"\n\s*\n")</code>
+      and preserved verbatim in the emitted chunks.</li>
+  <li>Only paragraphs that exceed the overflow budget are <em>raw-sliced</em>
+      by character (<code>_split_raw</code>) &mdash; no sentence-tokenisation,
+      no normalisation, no whitespace collapsing.</li>
+</ul>
+
+<div class="callout warn">
+  <strong>Why fidelity matters.</strong> Earlier versions of this code
+  normalised whitespace when merging paragraphs and split long paragraphs on
+  sentence boundaries. That accidentally <em>edited the task</em> during
+  preparation. Current chunking is lossless-by-default.
+</div>
+
+<!-- =============================================================== -->
+<h2 id="runners">6. Harness runners</h2>
+
+<p class="fpath">compactionbench/run.py</p>
+
+<p>
+Each runner is a Python class that drives the real CLI binary as a
+subprocess. There is no API fast-path; the point of the benchmark is to
+measure the harness, not just the model.
+</p>
+
+<h3>Shared structure</h3>
+<ol>
+  <li><code>chunk_text(task.context, chunk_tokens)</code> &rarr; list of chunks.</li>
+  <li>Loop over chunks, for each one:
+    <ul>
+      <li>Build the chunk prompt (<code>build_chunk_prompt</code>):<br>
+        <code>&ldquo;Context chunk i/N. Store this for later. Do not answer the
+        final question yet. Do not use tools. Do not browse. Reply only with:
+        OK&rdquo;</code> + chunk text.</li>
+      <li>Start a subprocess; on turn&nbsp;1 pass <code>--session-id</code>
+          (Claude) or no resume flag (Codex), otherwise resume the same session.</li>
+      <li>Parse the streamed JSONL output for assistant text, tool events,
+          and compaction events.</li>
+      <li>Record two <code>TurnTrace</code>s (user + assistant) with previews
+          capped at 160 chars (<code>preview()</code>).</li>
+    </ul>
+  </li>
+  <li>Final turn: <code>build_final_prompt(question)</code> asks for exactly
+      <code>{"answer": "..."}</code>.</li>
+  <li>Parse the last balanced JSON object, score it, write the artifact.</li>
+</ol>
+
+<h3>ClaudeCodeRunner specifics</h3>
+<pre>claude -p &lt;prompt&gt; --bare --model &lt;model&gt;
+  --effort &lt;low|…&gt; --output-format stream-json --verbose
+  --tools "" --permission-mode default
+  --disable-slash-commands --strict-mcp-config
+  [--settings &lt;json&gt;]   # for apiKeyHelper bare-mode auth
+  --session-id | --resume</pre>
+<ul>
+  <li>Runs <code>--bare</code> for clean isolation. OAuth/keychain auth is
+      <em>not</em> read by bare mode; strict runs need
+      <code>ANTHROPIC_API_KEY</code> or <code>--settings</code> with an
+      <code>apiKeyHelper</code>.</li>
+  <li>Tool allowlist is <em>empty string</em> &mdash; the run cannot use tools
+      at all.</li>
+  <li>Compaction events are detected from <code>type=system,
+      subtype=compact_boundary</code> with <code>compact_metadata.pre_tokens
+      / post_tokens</code>.</li>
+  <li>Server-side <code>web_search_requests</code> / <code>web_fetch_requests</code>
+      counts in the final <code>type=result</code> event are also recorded as
+      tool events.</li>
+</ul>
+
+<h3>CodexRunner specifics</h3>
+<pre>codex -m &lt;model&gt; -a never -s read-only -C &lt;tmpdir&gt;
+  -c model_reasoning_effort=&lt;…&gt;  -c model_verbosity=&lt;…&gt;
+  -c web_search=disabled
+  -c model_auto_compact_token_limit=&lt;off_limit | auto_limit&gt;
+  exec [--skip-git-repo-check] [resume &lt;sid&gt;] --json &lt;prompt&gt;</pre>
+<ul>
+  <li>Sandbox is <code>read-only</code>, approval policy is <code>never</code>,
+      web search is disabled &mdash; tools cannot contaminate the run.</li>
+  <li>Compaction signals come from <code>context_compacted</code>,
+      <code>compacted</code>, or <code>event_msg</code> with payload type
+      <code>context_compacted</code>.</li>
+  <li>If the streamed JSONL didn&rsquo;t include compaction events (some older
+      codex builds only record them in the session log), the runner falls
+      back to scraping
+      <code>~/.codex/sessions/**/*&lt;session_id&gt;.jsonl</code>
+      via <code>_load_codex_session_compaction_events</code>.</li>
+</ul>
+
+<div class="callout warn">
+  <strong>Contamination is strict.</strong> The definition is simply
+  <code>len(tool_events) > 0</code>. A single unexpected tool invocation
+  removes the run from the clean denominator. This is intentional &mdash; the
+  benchmark refuses to grade answers the harness could have looked up.
+</div>
+
+<!-- =============================================================== -->
+<h2 id="scorers">7. Scoring</h2>
+
+<p class="fpath">compactionbench/score.py &nbsp;·&nbsp; compactionbench/judge.py</p>
+
+<h3>Deterministic pass (<code>cbench score</code>)</h3>
+
+<p>
+Every scorer returns a float in <code>[0, 1]</code>. A row is marked
+<code>correct</code> iff <code>score_value &ge; 1.0</code>. Gold aliases are
+handled with <code>max(func(answer, candidate) for candidate in (gold, *aliases))</code>.
+</p>
+
+<table>
+<tr><th>Scorer</th><th>Behaviour</th><th>Typical use</th></tr>
+<tr><td><code>exact</code></td><td>case-sensitive strip-compare</td><td>RULER single keys (when exact case matters)</td></tr>
+<tr><td><code>exact_ci</code></td><td>case-insensitive</td><td>BABILong qa1&ndash;qa7, RULER niah_single</td></tr>
+<tr><td><code>substring_ci</code></td><td>gold must appear inside answer (case-insensitive)</td><td>RULER multivalue/multiquery, vt, cwe, fwe, qa_1/2</td></tr>
+<tr><td><code>multiple_choice</code></td><td>finds first <code>\b[ABCD]\b</code> in answer</td><td>MCQ-style upstreams</td></tr>
+<tr><td><code>csv_set_ci</code></td><td>sorted set of lower-cased tokens == gold set</td><td>BABILong qa8 (e.g. <code>apple,football</code>)</td></tr>
+<tr><td><code>numeric_075</code></td><td>partial credit: <code>0.75 ** |pred − gold|</code></td><td>OOLONG counting (exact gets 1.0, off-by-1 gets 0.75&hellip;)</td></tr>
+<tr><td><code>csv_overlap_ci</code></td><td><code>|gold &cap; pred| / |gold|</code></td><td>OOLONG set-overlap questions</td></tr>
+<tr><td><code>oolong_text_ci</code></td><td>normalises <code>**</code>, <code>\boxed{…}</code>, prefixes like <code>label:</code>, brackets</td><td>OOLONG text answers</td></tr>
+<tr><td><code>oolong_comparison_ci</code></td><td>canonicalises to <code>more common</code> / <code>less common</code> / <code>same frequency</code></td><td>OOLONG comparison</td></tr>
+<tr><td><code>date_ci</code></td><td>canonicalises multiple date formats to ISO <code>YYYY-MM-DD</code></td><td>OOLONG timeline dates</td></tr>
+<tr><td><code>month_year_ci</code></td><td>canonicalises &ldquo;March 2025&rdquo; / &ldquo;Mar 2025&rdquo; to a single form</td><td>OOLONG month-year questions</td></tr>
+</table>
+
+<h3>Aggregation</h3>
+<p><code>_aggregate</code> groups by <code>(harness, model, condition)</code>
+and also by <code>(harness, model, condition, benchmark)</code>, and reports:</p>
+<ul>
+  <li><code>n_total</code>, <code>n_clean</code> (non-contaminated),
+      <code>correct_clean</code>, <code>correct_all</code></li>
+  <li><code>accuracy</code> (on clean), <code>accuracy_all</code></li>
+  <li><code>avg_score</code> (mean over partial-credit scorers)</li>
+  <li><code>parse_ok_rate</code>, <code>contaminated_rate</code>,
+      <code>errors</code>, <code>compaction_events</code>,
+      <code>avg_duration_s</code></li>
+</ul>
+
+<h3>LLM-as-judge pass (<code>cbench judge</code>)</h3>
+<ul>
+  <li>Model: <code>qwen/qwq-32b</code> via OpenRouter (temperature 0, max 300 tokens).</li>
+  <li>Runs only on rows where deterministic scoring failed <em>and</em>
+      <code>parse_ok</code> is true, the run is not contaminated, and the
+      answer is non-empty. Correct rows and contaminated rows are never
+      re-judged.</li>
+  <li>Prompt is strict: "Do not award credit for clearly different facts.
+      Ignore only superficial formatting differences." Returns
+      <code>{ "equivalent": bool, "reason": str }</code>.</li>
+  <li>Final metric: <code>deterministic_correct OR judge_equivalent</code>.</li>
+  <li>Parallelised with a <code>ThreadPoolExecutor</code>; default 4 workers.</li>
+</ul>
+
+<div class="callout">
+  <strong>Why keep both.</strong> Deterministic accuracy is the honest number
+  for a paper. Judge-adjusted accuracy tells us whether failures are
+  &ldquo;close but wrong in formatting&rdquo; vs actually wrong &mdash; which
+  changes the interpretation of compaction behaviour.
+</div>
+
+<!-- =============================================================== -->
+<h2 id="specs">8. Reviewable experiment specs</h2>
+
+<p class="fpath">specs/</p>
+
+<p>
+Every real sweep is pinned by a YAML spec that a collaborator can read and
+approve before anything runs. <code>scripts/run_babilong_codex_parallel.py</code>
+is the generic runner &mdash; it accepts any spec that follows the same shape.
+</p>
+
+<h3>Current specs</h3>
+<ul>
+  <li><code>babilong_codex_128k_to_1m.yaml</code> &mdash; early length sweep.</li>
+  <li><code>babilong_codex_auto_high_models.yaml</code> &mdash; qa1&ndash;qa10, 3 models, 4 lengths, <code>auto</code>, high reasoning effort.</li>
+  <li><code>babilong_codex_auto_high_models_qa11_to_20_s3.yaml</code> &mdash; qa11&ndash;qa20 extension.</li>
+  <li><code>babilong_codex_auto_high_models_subset.yaml</code> &mdash; small canary subset.</li>
+  <li><code>oolong_synth_codex_auto_high_models.yaml</code> &mdash; counting/user/timeline aggregation.</li>
+  <li><code>oolong_real_codex_auto_high_models.yaml</code> &mdash; <em>new, in flight</em>, see below.</li>
+  <li><code>simple_long_context_experiment.md</code> &mdash; longer prose description of the design.</li>
+</ul>
+
+<h3>Anatomy of a spec</h3>
+<p>Example: <code>specs/oolong_real_codex_auto_high_models.yaml</code></p>
+<pre>experiment.name:          oolong_real_codex_auto_high_models
+benchmark.source_benchmark: oolong
+benchmark.dataset_name:   oolongbench/oolong-real
+benchmark.lengths:        [3ep, 6ep, 10ep, 16ep]
+benchmark.tasks:          [multidoc_rolls, multidoc_spells]
+benchmark.samples_per_split: 3
+
+runner.harness:           codex
+runner.models:            [gpt-5.4, gpt-5.4-mini, gpt-5.3-codex]
+runner.conditions:        [auto]
+runner.max_parallel_jobs: 8
+runner.timeout_s:         240
+runner.chunk_tokens_by_length:
+  3ep:  16000
+  6ep:  32000
+  10ep: 64000
+  16ep: 100000
+runner.codex:
+  web_search:         disabled
+  reasoning_effort:   high
+  verbosity:          low
+  auto_compact_limit: 150000
+  sandbox_mode:       read-only
+  approval_policy:    never
+  unique_temp_workdir_per_run: true
+
+outputs.root_dir: artifacts/batches/oolong_real_codex_auto_high_models</pre>
+
+<div class="callout">
+  <strong>Chunk size scales with context.</strong> Short contexts use small
+  chunks (more turns, more compaction pressure observable); long contexts use
+  bigger chunks so the absolute turn count stays manageable within the
+  timeout. This is per-length, explicitly listed in the spec.
+</div>
+
+<!-- =============================================================== -->
+<h2 id="results">9. Results so far</h2>
+
+<h3>9.1 BABILong qa1&ndash;qa10 &mdash; the foundational sweep</h3>
+<p class="fpath">artifacts/batches/babilong_codex_auto_high_models_parallel/20260422-123112</p>
+
+<h4>What BABILong is</h4>
+<p>
+A long-context benchmark built on the classic <strong>bAbI</strong> reasoning
+tasks, but with the supporting facts hidden inside a massive distractor
+context (filler text from <em>PG-19</em> books). The model has to find the
+relevant <em>needles</em> in a very long <em>haystack</em>.
+</p>
+
+<h4>qa1&ndash;qa10 &mdash; the &ldquo;exact fact&rdquo; family</h4>
+<table>
+<tr><th>Task</th><th>Name</th><th>What it probes</th></tr>
+<tr><td><code>qa1</code></td><td>single supporting fact</td><td>&ldquo;Where is Mary?&rdquo; &mdash; one-hop retrieval</td></tr>
+<tr><td><code>qa2</code></td><td>two supporting facts</td><td>Chain two facts together</td></tr>
+<tr><td><code>qa3</code></td><td>three supporting facts</td><td>Three-hop retrieval</td></tr>
+<tr><td><code>qa4</code></td><td>two-arg relations</td><td>&ldquo;What is east of the bedroom?&rdquo;</td></tr>
+<tr><td><code>qa5</code></td><td>three-arg relations</td><td>&ldquo;Who gave X to Y?&rdquo;</td></tr>
+<tr><td><code>qa6</code></td><td>yes/no questions</td><td>Binary fact check</td></tr>
+<tr><td><code>qa7</code></td><td>counting</td><td>&ldquo;How many objects is Mary carrying?&rdquo;</td></tr>
+<tr><td><code>qa8</code></td><td>lists / sets</td><td>Answers like <code>apple,football</code> &mdash; set-aware scoring</td></tr>
+<tr><td><code>qa9</code></td><td>simple negation</td><td>Handling &ldquo;not&rdquo; and absence</td></tr>
+<tr><td><code>qa10</code></td><td>indefinite knowledge</td><td>&ldquo;maybe&rdquo; / uncertain answers</td></tr>
+</table>
+
+<h4>Sweep setup</h4>
+<p>3 Codex models (<code>gpt-5.4</code>, <code>gpt-5.4-mini</code>,
+<code>gpt-5.3-codex</code>) &times; 4 lengths (<code>128k</code>,
+<code>256k</code>, <code>512k</code>, <code>1M</code>) &times; <code>auto</code>
+compaction with threshold <code>150&nbsp;000</code>
+= <strong>120 runs</strong>.</p>
+
+<div>
+  <span class="metric"><span class="n">120</span><span class="l">total runs</span></span>
+  <span class="metric"><span class="n">8.3%</span><span class="l">det. accuracy</span></span>
+  <span class="metric"><span class="n">39.2%</span><span class="l">judge-adj. accuracy</span></span>
+  <span class="metric"><span class="n">90/120</span><span class="l">runs with compaction</span></span>
+  <span class="metric"><span class="n">3.62</span><span class="l">avg compactions / run</span></span>
+</div>
+
+<h4>Main finding</h4>
+<ul>
+  <li>Deterministic accuracy was only <strong>8.3%</strong> but judge-adjusted
+      was <strong>39.2%</strong> &mdash; the model often produced
+      <em>semantically close but not exact</em> answers.</li>
+  <li>Compaction started at <strong>256k</strong> and was heaviest at
+      <strong>1M</strong>.</li>
+  <li>Readout: default compaction preserves the gist but loses the
+      <em>exact</em> binding that BABILong grades.</li>
+</ul>
+
+<h3>9.2 BABILong qa11&ndash;qa20 &mdash; the reasoning extension</h3>
+<p class="fpath">artifacts/batches/babilong_codex_auto_high_models_qa11_to_20_s3/20260422-095719</p>
+
+<h4>What qa11&ndash;qa20 add</h4>
+<p>Higher-level reasoning that goes beyond &ldquo;retrieve the right fact&rdquo;.</p>
+<table>
+<tr><th>Task</th><th>Name</th><th>What it probes</th></tr>
+<tr><td><code>qa11</code></td><td>basic coreference</td><td>Pronoun resolution across long spans</td></tr>
+<tr><td><code>qa12</code></td><td>conjunction</td><td>Handling &ldquo;and&rdquo;-linked facts</td></tr>
+<tr><td><code>qa13</code></td><td>compound coreference</td><td>Nested pronouns / multiple referents</td></tr>
+<tr><td><code>qa14</code></td><td>time reasoning</td><td>&ldquo;What did X do before Y?&rdquo;</td></tr>
+<tr><td><code>qa15</code></td><td>basic deduction</td><td>&ldquo;If all cats are grey, and Mary is a cat&hellip;&rdquo;</td></tr>
+<tr><td><code>qa16</code></td><td>basic induction</td><td>Generalise from examples</td></tr>
+<tr><td><code>qa17</code></td><td>positional reasoning</td><td>Spatial relationships between objects</td></tr>
+<tr><td><code>qa18</code></td><td>size reasoning</td><td>Ordering by size</td></tr>
+<tr><td><code>qa19</code></td><td>path finding</td><td>&ldquo;How do you go from X to Y?&rdquo;</td></tr>
+<tr><td><code>qa20</code></td><td>agent motivations</td><td>&ldquo;Why did X do Y?&rdquo;</td></tr>
+</table>
+
+<h4>Sweep setup</h4>
+<p>Same 3 models &times; 4 lengths &times; <code>auto</code>
+= <strong>360 runs</strong>.</p>
+
+<div>
+  <span class="metric"><span class="n">360</span><span class="l">total runs</span></span>
+  <span class="metric"><span class="n">123</span><span class="l">resolved (not usage-limited)</span></span>
+  <span class="metric"><span class="n">43.1%</span><span class="l">det. acc. on resolved</span></span>
+  <span class="metric"><span class="n">82.9%</span><span class="l">judge-adj. acc. on resolved</span></span>
+  <span class="metric"><span class="n">237</span><span class="l">usage-limit failures</span></span>
+</div>
+
+<h4>Main finding</h4>
+<ul>
+  <li><strong>237/360 runs</strong> were killed by usage-limit failures &mdash;
+      an honest blemish in the data, not hidden.</li>
+  <li>On the resolved subset: <strong>43.1%</strong> deterministic,
+      <strong>82.9%</strong> judge-adjusted.</li>
+  <li>Stronger: coreference (<code>qa13</code>, <code>qa11</code>) and
+      deduction (<code>qa15</code>) &mdash; the reasoning is local once the
+      right facts are found.</li>
+  <li>Weaker: path finding (<code>qa19</code>), positional
+      (<code>qa17</code>), motivations (<code>qa20</code>),
+      time (<code>qa14</code>) &mdash; these need structured multi-step
+      reasoning that compaction tends to disrupt.</li>
+</ul>
+
+<div class="callout warn">
+  <strong>Honest denominator.</strong> The analyzer tracks a
+  <em>resolved</em> subset alongside the raw total precisely because a
+  usage-limited run is a failure of the infrastructure, not of the model. The
+  resolved-only numbers are the fair readout.
+</div>
+
+<h3>9.3 OOLONG-synth &mdash; the aggregation sweep</h3>
+<p class="fpath">artifacts/batches/oolong_synth_codex_auto_high_models/20260423-173654</p>
+
+<h4>What OOLONG is</h4>
+<p>
+A <strong>different kind</strong> of long-context test. Instead of
+&ldquo;find a needle,&rdquo; tasks require <strong>aggregating many local
+decisions</strong> across the whole context. You cannot answer by retrieving
+one passage &mdash; you have to integrate evidence spread throughout.
+</p>
+
+<h4>Three task groups used</h4>
+<table>
+<tr><th>Group</th><th>What it probes</th></tr>
+<tr><td><code>counting</code></td><td>&ldquo;How many times did X happen?&rdquo; &mdash; count events across the context</td></tr>
+<tr><td><code>user</code></td><td>Attribute actions / preferences to specific users across a long log</td></tr>
+<tr><td><code>timeline</code></td><td>Reconstruct order-of-events from scattered mentions</td></tr>
+</table>
+
+<h4>Sweep setup</h4>
+<p>Same 3 models &times; 4 lengths &times; <code>auto</code>
+= <strong>108 runs</strong>, <strong>107 resolved</strong> (operationally
+clean, unlike qa11&ndash;qa20).</p>
+
+<div>
+  <span class="metric"><span class="n">108</span><span class="l">total runs</span></span>
+  <span class="metric"><span class="n">107</span><span class="l">resolved</span></span>
+  <span class="metric"><span class="n">46.3%</span><span class="l">det. accuracy</span></span>
+  <span class="metric"><span class="n">81/108</span><span class="l">runs with compaction</span></span>
+  <span class="metric"><span class="n">2.55</span><span class="l">avg compactions / run</span></span>
+</div>
+
+<h4>Main finding</h4>
+<ul>
+  <li>Deterministic accuracy <strong>46.3%</strong> &mdash; much higher than
+      BABILong.</li>
+  <li>By task group:
+      <code>counting</code> <strong>58.3%</strong> (easiest),
+      <code>timeline</code> <strong>44.4%</strong>,
+      <code>user</code> <strong>37.1%</strong> (hardest &mdash; aggregation
+      tied to a specific entity).</li>
+  <li>Compaction again starts at <strong>256k</strong> but the <em>average
+      number of compaction events per run is lower</em>
+      (<strong>2.55</strong> vs BABILong&rsquo;s <strong>3.62</strong>).</li>
+</ul>
+
+<h3>9.4 Cross-benchmark readout</h3>
+
+<table>
+<tr><th>Sweep</th><th>What it probes</th><th>Under compaction&hellip;</th></tr>
+<tr>
+  <td>BABILong qa1&ndash;qa10</td>
+  <td>Exact symbolic memory</td>
+  <td class="fpath" style="color:var(--bad)"><strong>Brittle</strong> &mdash; gist survives, exact binding is lost</td>
+</tr>
+<tr>
+  <td>BABILong qa11&ndash;qa20</td>
+  <td>Structured reasoning over retrieved facts</td>
+  <td class="fpath" style="color:var(--warn)"><strong>Mixed</strong> &mdash; coreference/deduction OK; path, position, motivation weak</td>
+</tr>
+<tr>
+  <td>OOLONG-synth</td>
+  <td>Aggregation over many local decisions</td>
+  <td class="fpath" style="color:var(--ok)"><strong>More survivable</strong> &mdash; summaries preserve counts and trends</td>
+</tr>
+</table>
+
+<div class="callout">
+  <strong>Why running all three matters.</strong> The asymmetry &mdash;
+  exact-state tasks fail, aggregation tasks partially survive &mdash; is
+  exactly what motivates the tiny-notebook sprint
+  (<a href="#sprint">&sect;11</a>). Default compaction seems to keep the kind
+  of memory that helps aggregation but hurts exact-state tasks. A structured
+  working note could plausibly rescue the latter without costing the former.
+  Comparison artifacts live under
+  <code>artifacts/analysis/oolong_vs_babilong/</code>.
+</div>
+
+<!-- =============================================================== -->
+<h2 id="current">10. What is happening right now</h2>
+
+<p>
+The working tree at the time of this doc has three unstaged edits and three
+new files. Together they set up the fourth compaction sweep:
+<strong>OOLONG-real multi-episode tasks</strong>.
+</p>
+
+<h3>10.1 Uncommitted edits</h3>
+
+<h4>compactionbench/loaders.py &nbsp;<span class="tag">+97 / −12</span></h4>
+<ul>
+  <li>Imports <code>estimate_tokens</code> from <code>chunking</code>.</li>
+  <li>Refactors <code>prepare_oolong_real_tasks</code> to build its metadata
+      dict once, and to include <code>length_label</code>,
+      <code>estimated_context_tokens</code> when available.</li>
+  <li>Task IDs now encode the length bucket:
+      <code>oolong-real-&lt;qtype&gt;-&lt;length_label&gt;-&lt;sample_id&gt;</code>.</li>
+  <li><strong>New function <code>prepare_oolong_real_task_matrix_from_hf</code></strong>
+      &mdash; the headline change. Pages through HF rows, bins them by
+      <code>(question_type, episode_count)</code>, stops once every bucket
+      has <code>count_per_bucket</code> samples, and raises
+      <code>RuntimeError</code> listing any buckets it couldn&rsquo;t fill.</li>
+  <li><strong>New helper <code>_episode_count</code></strong> &mdash; accepts
+      either a list or a <code>str</code> form via <code>ast.literal_eval</code>,
+      so &ldquo;how many episodes does this row have&rdquo; works regardless of
+      how HF stored it.</li>
+</ul>
+
+<h4>tests/test_loaders.py &nbsp;<span class="tag">+12</span></h4>
+<p>Adds coverage for the new episode-count matrix behaviour.</p>
+
+<h4>scripts/analyze_codex_batch.py &nbsp;<span class="tag">+1 / −1</span></h4>
+<p>Minor regex tweak:</p>
+<pre>LENGTH_RE = re.compile(r"-(1k|2k|4k|8k|16k|32k|64k|128k|256k|512k|1M|2M|4M|\d+ep)-")</pre>
+<p>Adds <code>\d+ep</code> so the analyzer recognises episode-count buckets
+(<code>3ep</code>, <code>6ep</code>, <code>10ep</code>, <code>16ep</code>)
+alongside the old token-count buckets.</p>
+
+<h3>10.2 New files (untracked)</h3>
+
+<h4>scripts/prepare_oolong_real_long_tasks.py</h4>
+<ul>
+  <li>CLI wrapper around <code>prepare_oolong_real_task_matrix_from_hf</code>.</li>
+  <li>Defaults:
+      <code>episode_counts=[3, 6, 10, 16]</code>,
+      <code>question_types=[&quot;multidoc_rolls&quot;, &quot;multidoc_spells&quot;]</code>,
+      <code>split=&quot;test&quot;</code>, <code>config=&quot;dnd&quot;</code>,
+      <code>count=3</code>.</li>
+  <li>Writes one JSONL per <code>(qtype, episode_count, sample_idx)</code>
+      triple under
+      <code>data/benchmarks/oolong_real_codex_3ep_to_16ep_s3/</code>.</li>
+  <li>Filename pattern:
+      <code>oolong_real_&lt;qtype&gt;_&lt;length&gt;_&lt;idx:03d&gt;.jsonl</code>.</li>
+</ul>
+
+<h4>specs/oolong_real_codex_auto_high_models.yaml</h4>
+<p>See the &ldquo;Anatomy of a spec&rdquo; example above &mdash; that spec is
+literally this file.</p>
+
+<h4>scripts/run_oolong_real_codex_parallel.sh</h4>
+<pre>#!/usr/bin/env bash
+set -euo pipefail
+ROOT_DIR="${1:-}"
+shift || true
+if [[ -n "${ROOT_DIR}" ]]; then
+  uv run python scripts/run_babilong_codex_parallel.py \
+    --spec specs/oolong_real_codex_auto_high_models.yaml \
+    --root-dir "$ROOT_DIR" "$@"
+else
+  uv run python scripts/run_babilong_codex_parallel.py \
+    --spec specs/oolong_real_codex_auto_high_models.yaml "$@"
+fi</pre>
+<p>Minimal shell wrapper: just forwards to the shared parallel runner with
+the new spec.</p>
+
+<h4>.github/</h4>
+<p>New directory under tracking, not yet inspected in detail. Presumably
+repo-hygiene templates (issues/PRs) being added alongside the sprint prep.</p>
+
+<h3>10.3 Why this is the interesting state</h3>
+
+<div class="callout">
+  This is the <strong>first sweep over real multi-episode transcripts</strong>.
+  The previous three sweeps used either synthetic retrieval haystacks
+  (RULER), synthetic reasoning puzzles (BABILong), or synthetic aggregation
+  (OOLONG-synth). <em>OOLONG-real</em> is messier, more realistic narrative,
+  and uses episode-count buckets instead of power-of-two token targets.
+</div>
+
+<p>
+Operationally, the episode-count matrix is the right abstraction:
+<strong>episode count is the natural unit of the upstream dataset</strong>,
+and pretending a 6-episode D&amp;D transcript is exactly &ldquo;298 144
+tokens&rdquo; would be false precision. Token estimates are recorded in
+metadata for reporting, but the primary bucket is episode count.
+</p>
+
+<!-- =============================================================== -->
+<h2 id="sprint">11. Exploration sprint &mdash; tiny notebook</h2>
+
+<p class="fpath">exploration_sprint.md</p>
+
+<p>
+The next curiosity-driven sprint is already scoped. The hypothesis is that
+harness compaction keeps the <em>gist</em> but loses the <em>exact state</em>,
+and a tiny structured notebook inside the agent loop might rescue
+exact-memory tasks without helping aggregation tasks as much.
+</p>
+
+<h3>The new condition</h3>
+<ul>
+  <li><code>auto</code> &mdash; current default compaction.</li>
+  <li><code>auto+notebook</code> &mdash; every few chunks, the agent writes a
+      tiny fixed-format note: latest known facts, corrections, key entities,
+      dates/times, unresolved conflicts. Not a chain of thought, not a
+      summary &mdash; just a working note.</li>
+</ul>
+
+<h3>Minimal sprint matrix</h3>
+<table>
+<tr><th>Axis</th><th>Values</th></tr>
+<tr><td>BABILong tasks</td><td><code>qa1</code>, <code>qa11</code>, <code>qa14</code></td></tr>
+<tr><td>OOLONG tasks</td><td><code>counting</code>, <code>timeline</code></td></tr>
+<tr><td>Lengths</td><td><code>256k</code>, <code>1M</code></td></tr>
+<tr><td>Models</td><td><code>gpt-5.4</code>, <code>gpt-5.4-mini</code></td></tr>
+<tr><td>Duration</td><td>1 week. Hard-stop 2026-04-30.</td></tr>
+</table>
+
+<h3>Pre-registered expectations</h3>
+<ul>
+  <li>Notebook helps BABILong more than OOLONG.</li>
+  <li>Notebook helps exact-memory tasks more than aggregation tasks.</li>
+  <li>Notebook does <em>not</em> help path finding or deep structured reasoning.</li>
+</ul>
+
+<h3>What would count as a real surprise</h3>
+<ol>
+  <li>Notebook helps OOLONG a lot but barely helps BABILong &rarr; the real
+      issue isn&rsquo;t exact symbolic loss but something about task
+      decomposition.</li>
+  <li>Notebook <em>hurts</em> performance &rarr; extra notebook tokens cause
+      more compaction, or model trusts bad notes, or external notes interfere
+      with internal reasoning. Opens a different research direction on naive
+      memory aids backfiring.</li>
+</ol>
+
+<h3>Decision rule</h3>
+<ul>
+  <li><strong>Graduate</strong> if notebook clearly helps exact-memory tasks
+      at long lengths, more than aggregation.</li>
+  <li><strong>Shelve</strong> if no real difference.</li>
+  <li><strong>Pivot</strong> if an interesting unexpected effect shows up
+      instead.</li>
+</ul>
+
+<!-- =============================================================== -->
+<h2 id="layout">12. Repository layout</h2>
+
+<pre>CompactionBench/
+├── README.md                 # What / why / how to run
+├── plan.md                   # Advisor-facing narrative
+├── exploration_sprint.md     # Next sprint: tiny notebook
+├── pyproject.toml            # uv-managed project
+├── uv.lock
+├── compactionbench/
+│   ├── __init__.py
+│   ├── schema.py             # Pydantic: TaskRow, RunRecord, AgentAnswer, …
+│   ├── chunking.py           # Paragraph-aware, fidelity-preserving chunking
+│   ├── loaders.py            # RULER / BABILong / OOLONG-{synth,real} → TaskRow
+│   ├── run.py                # ClaudeCodeRunner + CodexRunner (subprocess)
+│   ├── score.py              # Deterministic scorers + aggregation
+│   ├── judge.py              # Optional LLM-as-judge (qwen/qwq-32b via OpenRouter)
+│   └── cli.py                # Typer CLI (prepare, run, score, judge, report)
+├── specs/
+│   ├── simple_long_context_experiment.md
+│   ├── babilong_codex_128k_to_1m.yaml
+│   ├── babilong_codex_auto_high_models.yaml
+│   ├── babilong_codex_auto_high_models_subset.yaml
+│   ├── babilong_codex_auto_high_models_qa11_to_20_s3.yaml
+│   ├── oolong_synth_codex_auto_high_models.yaml
+│   └── oolong_real_codex_auto_high_models.yaml         ← new
+├── scripts/
+│   ├── prepare_babilong_missing_long_tasks.py
+│   ├── prepare_oolong_synth_long_tasks.py
+│   ├── prepare_oolong_real_long_tasks.py               ← new
+│   ├── run_babilong_codex_parallel.py                  # generic parallel runner
+│   ├── run_babilong_codex_auto_high_models.sh
+│   ├── run_oolong_synth_codex_parallel.sh
+│   ├── run_oolong_real_codex_parallel.sh               ← new
+│   ├── analyze_codex_batch.py                          # modified: episode regex
+│   └── compare_batch_analyses.py
+├── tests/
+│   ├── fixtures/
+│   ├── test_schema.py
+│   ├── test_loaders.py                                 # modified: +matrix tests
+│   ├── test_run_parsers.py
+│   ├── test_score.py
+│   ├── test_score_babilong.py
+│   ├── test_score_contamination.py
+│   ├── test_score_oolong.py
+│   └── test_judge.py
+├── data/                     # prepared JSONL task rows (inputs to run)
+├── docs/
+│   ├── results_so_far.md
+│   └── continual-bench-design.html                     ← this file
+├── artifacts/                # run artifacts (intentionally not committed)
+└── .github/                                            ← new (untracked)</pre>
+
+<!-- =============================================================== -->
+<h2 id="caveats">13. Caveats, guardrails, open questions</h2>
+
+<h3>Explicit scope-cuts (things the repo deliberately does not do)</h3>
+<ul>
+  <li>No <code>README.md</code> task fixtures.</li>
+  <li>No <code>docs/chunk_XX.md</code> split files.</li>
+  <li>No distractor padding machinery.</li>
+  <li>No manual compaction variants &mdash; only harness-native <code>off</code> / <code>auto</code>.</li>
+  <li>No file-reading benchmark tasks &mdash; the context must live in
+      conversation history, never on disk.</li>
+</ul>
+
+<h3>Guardrails</h3>
+<ul>
+  <li><code>extra="forbid"</code> on every Pydantic model.</li>
+  <li><code>ensure_unique_task_ids</code> runs at write time and before every
+      batch run.</li>
+  <li>Claude <code>--bare</code> + <code>--tools ""</code> + <code>--strict-mcp-config</code>.</li>
+  <li>Codex <code>-a never</code> + <code>-s read-only</code> + <code>web_search=disabled</code>.</li>
+  <li>Any tool event &rarr; run is excluded from the clean metric.</li>
+  <li>Per-run temp workdir so cached files from one task can&rsquo;t leak to
+      the next.</li>
+</ul>
+
+<h3>Known limitations</h3>
+<ul>
+  <li><strong>OAuth-only Claude runs are not the strict benchmark condition.</strong>
+      Bare mode does not read keychain/OAuth auth; strict runs require
+      <code>ANTHROPIC_API_KEY</code> or <code>apiKeyHelper</code>-based
+      <code>--settings</code>.</li>
+  <li><strong>Usage-limit failures</strong> were significant in the qa11&ndash;qa20
+      extension (237/360). The analyzer now tracks a <em>resolved subset</em>
+      as the honest readout.</li>
+  <li><strong>OOLONG-real prepared set</strong> has so far only used the
+      <code>negation</code> subset for stability. The in-progress sweep adds
+      <code>multidoc_rolls</code> and <code>multidoc_spells</code> over 3&ndash;16
+      episodes.</li>
+  <li><strong>No manual compaction variants</strong> &mdash; we measure the
+      default harness behaviour, not an intervention. The sprint in
+      <a href="#sprint">&sect;11</a> is the first proposed intervention.</li>
+</ul>
+
+<h3>Open questions worth naming</h3>
+<ol>
+  <li>Does <code>auto+notebook</code> specifically rescue exact-memory tasks,
+      as predicted, or does it backfire by inflating context and triggering
+      <em>more</em> compaction?</li>
+  <li>Do OOLONG-real multi-episode transcripts compact earlier than synthetic
+      contexts of similar token count, because they lack the regular structure
+      a summariser can exploit?</li>
+  <li>What is the correct denominator for the main metric in the presence of
+      usage-limit errors &mdash; total, resolved, or resolved-and-clean?
+      (Current default: resolved-and-clean.)</li>
+  <li>Is judge-adjusted accuracy &ldquo;free lunch&rdquo; signal, or is a
+      qwq-32b judge too permissive on BABILong-style exact answers?</li>
+</ol>
+
+<footer>
+  <p>
+    Generated 2026-04-23 from the live working tree.
+    Snapshot reflects: commit <code>544e372</code> plus unstaged edits to
+    <code>compactionbench/loaders.py</code>,
+    <code>scripts/analyze_codex_batch.py</code>,
+    <code>tests/test_loaders.py</code>, and the three new files noted in
+    <a href="#current">&sect;10</a>.
+  </p>
+</footer>
+
+</div>
+</body>
+</html>

@@ -35,7 +35,7 @@ from compactionbench.run import _load_codex_session_compaction_events
 from compactionbench.schema import RunRecord
 from compactionbench.score import iter_run_records, score_value_one
 
-LENGTH_RE = re.compile(r"-(1k|2k|4k|8k|16k|32k|64k|128k|256k|512k|1M|2M|4M)-")
+LENGTH_RE = re.compile(r"-(1k|2k|4k|8k|16k|32k|64k|128k|256k|512k|1M|2M|4M|\d+ep)-")
 
 
 @dataclass

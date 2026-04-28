@@ -14,6 +14,7 @@ from typing import Iterable
 
 from pyarrow import parquet as pq
 
+from .chunking import estimate_tokens
 from .schema import Scorer, TaskRow, load_task_rows, write_task_rows
 
 RULER_TASK_CONFIG: dict[str, tuple[Scorer, str]] = {
@@ -553,7 +554,25 @@ def prepare_oolong_real_tasks(
 
         gold, scorer = _parse_oolong_real_gold(gold_raw)
         sample_id = str(sample.get("id") or len(rows))
-        task_id = f"oolong-real-{_sanitize(question_type)}-{_sanitize(sample_id)}"
+        length_label = str(sample.get("length_label") or "").strip()
+        if length_label:
+            task_id = f"oolong-real-{_sanitize(question_type)}-{_sanitize(length_label)}-{_sanitize(sample_id)}"
+        else:
+            task_id = f"oolong-real-{_sanitize(question_type)}-{_sanitize(sample_id)}"
+        metadata = {
+            "input_path": str(input_path),
+            "dataset_name": dataset_name,
+            "split": split,
+            "config": config,
+            "question_type": question_type,
+            "episodes": sample.get("episodes"),
+            "campaign": sample.get("campaign"),
+            "context_window_id": sample.get("context_window_id"),
+        }
+        if sample.get("estimated_context_tokens") is not None:
+            metadata["estimated_context_tokens"] = sample.get("estimated_context_tokens")
+        if length_label:
+            metadata["length_label"] = length_label
         rows.append(
             TaskRow(
                 task_id=task_id,
@@ -565,16 +584,7 @@ def prepare_oolong_real_tasks(
                 gold_answer=gold,
                 gold_answer_aliases=[],
                 scorer=scorer_override or scorer,
-                metadata={
-                    "input_path": str(input_path),
-                    "dataset_name": dataset_name,
-                    "split": split,
-                    "config": config,
-                    "question_type": question_type,
-                    "episodes": sample.get("episodes"),
-                    "campaign": sample.get("campaign"),
-                    "context_window_id": sample.get("context_window_id"),
-                },
+                metadata=metadata,
             )
         )
         if len(rows) >= count:
@@ -609,6 +619,68 @@ def prepare_oolong_real_tasks_from_hf(
         scorer_override=scorer_override,
         dataset_name=dataset_name,
     )
+
+
+
+def prepare_oolong_real_task_matrix_from_hf(
+    *,
+    split: str,
+    count_per_bucket: int,
+    question_types: list[str],
+    episode_counts: list[int],
+    config: str = OOLONG_REAL_CONFIG,
+    dataset_name: str = OOLONG_REAL_DATASET,
+    scorer_override: Scorer | None = None,
+    page_size: int = 100,
+) -> dict[tuple[str, int], list[TaskRow]]:
+    wanted = {(question_type, episode_count) for question_type in question_types for episode_count in episode_counts}
+    buckets: dict[tuple[str, int], list[dict]] = {key: [] for key in wanted}
+
+    offset = 0
+    total: int | None = None
+    while total is None or offset < total:
+        page_rows, total = _read_hf_rows_page_resilient(
+            dataset_name=dataset_name,
+            config=config,
+            split=split,
+            offset=offset,
+            length=page_size,
+        )
+        if not page_rows:
+            break
+
+        for row in page_rows:
+            question_type = str(row.get("question_type") or "unknown")
+            episode_count = _episode_count(row.get("episodes"))
+            key = (question_type, episode_count)
+            if key not in wanted:
+                continue
+            if len(buckets[key]) >= count_per_bucket:
+                continue
+            copied = dict(row)
+            copied["length_label"] = f"{episode_count}ep"
+            copied["estimated_context_tokens"] = estimate_tokens(str(row.get("context_window_text") or ""))
+            buckets[key].append(copied)
+
+        if all(len(buckets[key]) >= count_per_bucket for key in wanted):
+            break
+        offset += len(page_rows)
+
+    missing = {key: len(rows) for key, rows in buckets.items() if len(rows) < count_per_bucket}
+    if missing:
+        raise RuntimeError(f"Could not fill all OOLONG-real buckets: {missing}")
+
+    return {
+        key: _prepare_oolong_real_records(
+            rows,
+            count=count_per_bucket,
+            split=split,
+            config=config,
+            scorer_override=scorer_override,
+            dataset_name=dataset_name,
+        )
+        for key, rows in buckets.items()
+    }
 
 
 def _prepare_oolong_synth_records(
@@ -963,6 +1035,21 @@ def _parse_oolong_real_gold(raw: str) -> tuple[str, Scorer]:
     if "," in value:
         return value, "csv_overlap_ci"
     return value, "oolong_text_ci"
+
+
+
+def _episode_count(value: object) -> int:
+    if isinstance(value, list):
+        return len(value)
+    if isinstance(value, str):
+        try:
+            parsed = ast.literal_eval(value)
+        except Exception:
+            return 0
+        if isinstance(parsed, list):
+            return len(parsed)
+    return 0
+
 
 
 def _read_hf_rows_api_filtered(

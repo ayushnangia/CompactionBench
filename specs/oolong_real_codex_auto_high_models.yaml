@@ -1,0 +1,65 @@
+# Reviewable experiment plan for the Codex × OOLONG-real auto-compaction sweep.
+#
+# This is a compaction-focused OOLONG-real study over multi-episode contexts.
+# Instead of single-episode questions, it focuses on longer multi-document cases
+# where the harness has to preserve information across several transcripts.
+
+experiment:
+  name: oolong_real_codex_auto_high_models
+  objective: >-
+    Run Codex on multi-episode OOLONG-real tasks using the same explicit
+    auto-compaction settings as the BABILong and OOLONG-synth runs, to measure
+    how well the harness preserves information over longer conversational
+    transcripts from the real D&D setting.
+
+benchmark:
+  source_benchmark: oolong
+  dataset_name: oolongbench/oolong-real
+  prepared_tasks_dir: data/benchmarks/oolong_real_codex_3ep_to_16ep_s3
+  prepared_file_template: oolong_real_{task}_{length}.jsonl
+  prepared_file_sample_glob: oolong_real_{task}_{length}_*.jsonl
+  lengths:
+    - 3ep
+    - 6ep
+    - 10ep
+    - 16ep
+  tasks:
+    - multidoc_rolls
+    - multidoc_spells
+  samples_per_split: 3
+  notes:
+    - Prepared files are sampled from the `dnd` config of OOLONG-real.
+    - Episode-count buckets are a more honest label here than pretending these are exact power-of-two token lengths.
+    - Approximate context scales are: 3ep≈129k, 6ep≈298k, 10ep≈458k, 16ep≈773k.
+
+runner:
+  harness: codex
+  models:
+    - gpt-5.4
+    - gpt-5.4-mini
+    - gpt-5.3-codex
+  conditions:
+    - auto
+  max_parallel_jobs: 8
+  timeout_s: 240
+  chunk_tokens_by_length:
+    3ep: 16000
+    6ep: 32000
+    10ep: 64000
+    16ep: 100000
+  codex:
+    web_search: disabled
+    reasoning_effort: high
+    verbosity: low
+    auto_compact_limit: 150000
+    sandbox_mode: read-only
+    approval_policy: never
+    add_dirs: []
+    unique_temp_workdir_per_run: true
+  rationale:
+    - Keep the same Codex settings as the other long-context studies.
+    - Focus on the multi-episode OOLONG-real regime where compaction is more likely to matter.
+    - Use episode-count labels to stay faithful to the real dataset layout.
+
+outputs:
+  root_dir: artifacts/batches/oolong_real_codex_auto_high_models

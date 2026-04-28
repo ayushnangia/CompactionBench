@@ -107,6 +107,18 @@ def test_prepare_oolong_real_tasks_emits_rows() -> None:
 
 
 
+def test_prepare_oolong_real_tasks_uses_length_label_when_present(tmp_path) -> None:
+    path = tmp_path / "real.jsonl"
+    path.write_text(
+        '{"id":"x1","context_window_id":"cw1","context_window_text":"ctx","question":"q?","answer":"5","question_type":"multidoc_rolls","episodes":[1,2,3],"campaign":"campaign1","length_label":"3ep","estimated_context_tokens":129000}\n'
+    )
+    rows = prepare_oolong_real_tasks(path, count=1)
+    assert rows[0].task_id == "oolong-real-multidoc_rolls-3ep-x1"
+    assert rows[0].metadata["length_label"] == "3ep"
+    assert rows[0].metadata["estimated_context_tokens"] == 129000
+
+
+
 def test_extend_babilong_rows_with_long_carriers_embeds_short_context() -> None:
     short_row = TaskRow(
         task_id="babilong-qa11-0k-s0",
