@@ -123,15 +123,3 @@ Light bars: how often the gold answer appears in the context.
 Dark bars: how often the model answers correctly.
 
 The gap is the difference. BABILong has a large gap. OOLONG does not.
-
----
-
-## Paper metrics
-
-Three candidate metrics for researchers:
-
-1. **Compaction Retention Score** — what fraction of answer-bearing facts survive compression?
-2. **Compaction Degradation Ratio** — accuracy drop as context grows, separated by task type.
-3. **Exact vs Aggregate Gap** — the difference between exact-memory and aggregation accuracy under compaction.
-
-The gap metric is the strongest: it separates information retention from information utilization, giving researchers a diagnostic rather than just an accuracy number.
