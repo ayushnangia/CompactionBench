@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CompactionBench — Failure Cases</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; padding: 40px 24px; line-height: 1.6; }
+  .container { max-width: 800px; margin: 0 auto; }
+  h1 { font-size: 22px; color: #f0f6fc; margin-bottom: 4px; }
+  .subtitle { color: #8b949e; font-size: 13px; margin-bottom: 32px; }
+
+  .stats { display: flex; gap: 12px; margin-bottom: 32px; }
+  .stat { flex: 1; background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; text-align: center; }
+  .stat-num { font-size: 32px; font-weight: 700; }
+  .stat-label { font-size: 11px; color: #8b949e; margin-top: 4px; }
+
+  .section { margin-bottom: 36px; }
+  .section-title { font-size: 15px; color: #58a6ff; margin-bottom: 12px; font-weight: 600; }
+  .failure { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+  .failure-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; margin-bottom: 8px; }
+  .badge-red { background: #da3633; color: #fff; }
+  .badge-orange { background: #9e6a03; color: #fff; }
+  .badge-yellow { background: #6e7681; color: #fff; }
+  .failure-q { font-size: 12px; color: #8b949e; margin-bottom: 4px; }
+  .failure-row { display: flex; gap: 16px; align-items: baseline; }
+  .failure-gold { color: #3fb950; font-weight: 600; font-size: 14px; }
+  .failure-ans { color: #f85149; font-size: 14px; }
+  .failure-arrow { color: #484f58; }
+  .failure-why { font-size: 12px; color: #8b949e; margin-top: 8px; }
+
+  .insight { background: #1a2332; border-left: 3px solid #58a6ff; padding: 14px 18px; border-radius: 0 6px 6px 0; margin: 16px 0; font-size: 13px; }
+  .insight strong { color: #f0f6fc; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+  th { text-align: left; padding: 6px 10px; background: #161b22; color: #8b949e; font-weight: 500; border-bottom: 1px solid #21262d; }
+  td { padding: 6px 10px; border-bottom: 1px solid #21262d; vertical-align: top; }
+  .divider { border: none; border-top: 1px solid #21262d; margin: 32px 0; }
+  .footer { font-size: 11px; color: #484f58; margin-top: 32px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>CompactionBench — Failure Cases</h1>
+<p class="subtitle">648 runs analyzed. 184 failures. What goes wrong and why.</p>
+
+<div class="stats">
+  <div class="stat">
+    <div class="stat-num" style="color:#f85149">184</div>
+    <div class="stat-label">Total failures</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num" style="color:#d29922">90</div>
+    <div class="stat-label">Wrong answer</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num" style="color:#f85149">22</div>
+    <div class="stat-label">Fact dropped</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num" style="color:#d29922">12</div>
+    <div class="stat-label">Wrong location</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num" style="color:#f85149">15</div>
+    <div class="stat-label">Counting error</div>
+  </div>
+</div>
+
+<!-- ====== Category 1: Fact Dropped ====== -->
+<div class="section">
+  <div class="section-title">🔴 Fact dropped by compression (22 failures)</div>
+  <div class="section-desc" style="color:#8b949e;font-size:13px;">The compressor deleted the answer-bearing fact. The model knows it is missing and admits it.</div>
+
+  <div class="failure">
+    <span class="failure-badge badge-red">FACT DROPPED</span>
+    <div class="failure-q">Q: Where is Mary?</div>
+    <div class="failure-row">
+      <span class="failure-gold">bathroom</span>
+      <span class="failure-arrow">→</span>
+      <span class="failure-ans">Not specified in the provided context.</span>
+    </div>
+    <div class="failure-why">Compressor selected filler sentences instead of the answer. Mary's location was lost.</div>
+  </div>
+
+  <div class="failure">
+    <span class="failure-badge badge-red">FACT DROPPED</span>
+    <div class="failure-q">Q: How many objects is Mary carrying?</div>
+    <div class="failure-row">
+      <span class="failure-gold">one</span>
+      <span class="failure-arrow">→</span>
+      <span class="failure-ans">The context does not specify how many objects Mary is carrying.</span>
+    </div>
+    <div class="failure-why">The count fact was scattered across the context. Compressor missed it entirely.</div>
+  </div>
+
+  <div class="insight">
+    <strong>Root cause:</strong> Query-blind compression has no signal for relevance. It selects facts by surface statistics (rarity, novelty). When the answer-bearing fact looks like filler, it gets dropped.
+  </div>
+</div>
+
+<!-- ====== Category 2: Wrong Location ====== -->
+<div class="section">
+  <div class="section-title">📍 Wrong location / entity (12 failures)</div>
+  <div class="section-desc" style="color:#8b949e;font-size:13px;">The model picks a place or person from the context — but the wrong one. Multiple locations/entities cause confusion.</div>
+
+  <div class="failure">
+    <span class="failure-badge badge-orange">WRONG LOCATION</span>
+    <div class="failure-q">Q: Where is Mary?</div>
+    <div class="failure-row">
+      <span class="failure-gold">kitchen</span>
+      <span class="failure-arrow">→</span>
+      <span class="failure-ans">bedroom</span>
+    </div>
+    <div class="failure-why">Multiple rooms mentioned. Model picked the wrong one. Classic entity confusion under long context.</div>
+  </div>
+
+  <div class="failure">
+    <span class="failure-badge badge-orange">WRONG LOCATION</span>
+    <div class="failure-q">Q: Where is Mary?</div>
+    <div class="failure-row">
+      <span class="failure-gold">bathroom</span>
+      <span class="failure-arrow">→</span>
+      <span class="failure-ans">bedroom</span>
+    </div>
+    <div class="failure-why">Same pattern. "bedroom" appears more often in the context. The model picks the most frequent location, not the correct one.</div>
+  </div>
+
+  <div class="insight">
+    <strong>Root cause:</strong> The model preserves the general story ("Mary moved around rooms") but loses the exact location. This is the "keeps gist, loses state" failure mode.
+  </div>
+</div>
+
+<!-- ====== Category 3: Counting Error ====== -->
+<div class="section">
+  <div class="section-title">🔢 Counting error (15 failures)</div>
+  <div class="section-desc" style="color:#8b949e;font-size:13px;">The model needs to aggregate many small scattered facts. Compression deletes most of them.</div>
+
+  <div class="failure">
+    <span class="failure-badge badge-red">COUNTING ERROR</span>
+    <div class="failure-q">Q: How many job_failed events occurred?</div>
+    <div class="failure-row">
+      <span class="failure-gold">15</span>
+      <span class="failure-arrow">→</span>
+      <span class="failure-ans">3</span>
+    </div>
+    <div class="failure-why">Compressor kept 3 events out of 15. The model counts from what survived, not the original total.</div>
+  </div>
+
+  <div class="failure">
+    <span class="failure-badge badge-red">COUNTING ERROR</span>
+    <div class="failure-q">Q: Is True more common than False?</div>
+    <div class="failure-row">
+      <span class="failure-gold">more common than</span>
+      <span class="failure-arrow">→</span>
+      <span class="failure-ans">True is less common than False</span>
+    </div>
+    <div class="failure-why">Binary aggregation flips under compression. With full context the model gets it right. Compressed: inverted.</div>
+  </div>
+
+  <div class="insight">
+    <strong>Root cause:</strong> Counting requires broad coverage. Compression selects a few "important" facts and drops the rest. The model cannot count what it cannot see. A stronger model (gpt-5.4) counts perfectly with full context — 0% with compression.
+  </div>
+</div>
+
+<!-- ====== Category 4: Verbose Wrong ====== -->
+<div class="section">
+  <div class="section-title">🗣 Verbose but wrong fact (45 failures)</div>
+  <div class="section-desc" style="color:#8b949e;font-size:13px;">The model is confident and writes a full sentence — but gets the core fact wrong.</div>
+
+  <div class="failure">
+    <span class="failure-badge badge-yellow">CONFIDENTLY WRONG</span>
+    <div class="failure-q">Q: Who did Fred give the football to?</div>
+    <div class="failure-row">
+      <span class="failure-gold">Jeff</span>
+      <span class="failure-arrow">→</span>
+      <span class="failure-ans">Cannot be determined from the provided context chunks.</span>
+    </div>
+    <div class="failure-why">Model admits it does not know. Better than hallucination, but still a failure. The fact was in the original context.</div>
+  </div>
+
+  <div class="failure">
+    <span class="failure-badge badge-yellow">CONFIDENTLY WRONG</span>
+    <div class="failure-q">Q: What is the current deployment branch?</div>
+    <div class="failure-row">
+      <span class="failure-gold">epsilon</span>
+      <span class="failure-arrow">→</span>
+      <span class="failure-ans">beta</span>
+    </div>
+    <div class="failure-why">The value changed 4 times (alpha→beta→gamma→delta→epsilon). Model picked an intermediate value instead of the latest.</div>
+  </div>
+
+  <div class="insight">
+    <strong>Root cause:</strong> Multi-step updates confuse the model. It remembers a value was mentioned but not that it was superseded. This is the "stale fact" failure mode — the model remembers an old value confidently.
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ====== Summary ====== -->
+<div class="section">
+  <div class="section-title">Failure taxonomy</div>
+  
+  <table>
+    <tr><th>Category</th><th>Count</th><th>Example</th><th>Mechanism</th></tr>
+    <tr>
+      <td>Fact dropped</td>
+      <td class="c" style="color:#f85149">22</td>
+      <td>"Not specified in the provided context"</td>
+      <td>Compressor missed the answer-bearing fact</td>
+    </tr>
+    <tr>
+      <td>Wrong location</td>
+      <td class="c" style="color:#d29922">12</td>
+      <td>"bedroom" instead of "bathroom"</td>
+      <td>Multiple similar locations cause confusion</td>
+    </tr>
+    <tr>
+      <td>Counting error</td>
+      <td class="c" style="color:#f85149">15</td>
+      <td>"3" instead of "15"</td>
+      <td>Compressor deleted most events</td>
+    </tr>
+    <tr>
+      <td>Confidently wrong</td>
+      <td class="c" style="color:#d29922">45</td>
+      <td>"beta" instead of "epsilon"</td>
+      <td>Picked stale intermediate value</td>
+    </tr>
+    <tr>
+      <td>Other wrong answer</td>
+      <td class="c" style="color:#f85149">90</td>
+      <td>"a child" instead of "nothing"</td>
+      <td>Model cannot find the fact at all</td>
+    </tr>
+  </table>
+
+  <div class="insight">
+    <strong>Bottom line:</strong> Compaction failures are not random. They cluster into predictable categories: dropped facts (compressor missed it), confused entities (too many similar things), stale values (picked old version), and lost counts (needed broad coverage). This means the failures are <strong>diagnosable</strong> — not just "the model got it wrong."
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<div class="footer">
+  CompactionBench · github.com/ayushnangia/CompactionBench · April 2026 · 648 runs analyzed
+</div>
+
+</div>
+</body>
+</html>

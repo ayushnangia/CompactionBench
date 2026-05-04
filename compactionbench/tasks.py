@@ -92,6 +92,153 @@ def generate_stale_update_tasks(
     return tasks
 
 
+    return tasks
+
+
+def generate_stale_update_tasks_hard(
+    *,
+    count: int,
+    filler_sentences: int = 8000,
+    seed: int = 0,
+) -> list[TaskRow]:
+    """Harder variant: multiple intermediate values, distractor suggestions."""
+    rng = random.Random(seed)
+    tasks: list[TaskRow] = []
+    filler = _build_filler_paragraphs(rng, filler_sentences)
+
+    templates: list[dict] = [
+        {"topic": "deployment_branch", "values": ["alpha", "beta", "gamma", "delta", "epsilon"]},
+        {"topic": "API endpoint", "values": ["/v1/search", "/v2/search", "/v2/query", "/v3/query"]},
+        {"topic": "default model", "values": ["gpt-5.4-mini", "gpt-5.3", "gpt-5.4", "claude-sonnet-4"]},
+        {"topic": "max workers", "values": ["2", "4", "8", "16"]},
+        {"topic": "log level", "values": ["debug", "info", "warn", "error"]},
+        {"topic": "cache strategy", "values": ["none", "lru", "redis", "memcached"]},
+        {"topic": "timeout", "values": ["10s", "30s", "60s", "120s"]},
+        {"topic": "retry policy", "values": ["none", "once", "exponential", "fixed"]},
+    ]
+
+    for idx in range(count):
+        t = rng.choice(templates)
+        topic = t["topic"]
+        values = list(t["values"])
+        rng.shuffle(values)
+        
+        signals = []
+        for i, v in enumerate(values):
+            if i == 0:
+                signals.append(f"Initially, the {topic} was set to {v}.")
+            elif i == len(values) - 1:
+                signals.append(f"After final review, the {topic} is now {v}. This is the current confirmed value.")
+            else:
+                signals.append(f"Then the team changed the {topic} to {v}.")
+        
+        distractor = f"Someone suggested changing the {topic} to {values[0]}_v2 but this was rejected."
+        signals.insert(len(signals)//2, distractor)
+        
+        positions = [rng.uniform(0.05, 0.95) for _ in signals]
+        context = _inject_signals(rng, filler, signals=signals, positions=positions)
+        
+        final_value = values[-1]
+        question = f"What is the current {topic}?"
+        gold = final_value
+
+        tasks.append(
+            TaskRow(
+                task_id=f"synthetic-stale-update-hard-{idx:03d}",
+                source_benchmark=BENCHMARK,
+                source_task="stale_update_hard",
+                source_sample_id=str(idx),
+                context=context,
+                question=question,
+                gold_answer=gold,
+                gold_answer_aliases=[],
+                scorer=SCORER_EXACT_CI,
+                metadata={
+                    "generator": "stale_update_hard",
+                    "topic": topic,
+                    "values_sequence": values,
+                    "final_value": final_value,
+                    "filler_sentences": filler_sentences,
+                },
+            )
+        )
+    return tasks
+
+
+def generate_entity_binding_tasks_hard(
+    *,
+    count: int,
+    filler_sentences: int = 8000,
+    seed: int = 0,
+) -> list[TaskRow]:
+    """Harder variant: 5 entities with confusingly similar names."""
+    rng = random.Random(seed)
+    tasks: list[TaskRow] = []
+    filler = _build_filler_paragraphs(rng, filler_sentences)
+
+    entity_pools = [
+        [
+            ("Project Orion", "K-1942"),
+            ("Project Orin", "K-1943"),
+            ("Project Oren", "K-1944"),
+            ("Project Oran", "K-1945"),
+            ("Project Orun", "K-1946"),
+        ],
+        [
+            ("service Mercury", "port 3000"),
+            ("service Mercurio", "port 3001"),
+            ("service Meridian", "port 3002"),
+            ("service Merit", "port 3003"),
+            ("service Merge", "port 3004"),
+        ],
+        [
+            ("user archer", "token A7X9"),
+            ("user archie", "token B3F2"),
+            ("user arcadia", "token C8H5"),
+            ("user archive", "token D4G1"),
+            ("user archon", "token E9M6"),
+        ],
+    ]
+
+    for idx in range(count):
+        pool = rng.choice(entity_pools)
+        bindings = list(pool)
+        rng.shuffle(bindings)
+
+        binding_lines = [f"{entity} uses {value}." for entity, value in bindings]
+        a, b = bindings[0], bindings[1]
+        distractor = f"{a[0]} was discussed alongside {b[0]}, but their values are different."
+        binding_lines.append(distractor)
+        
+        positions = [rng.uniform(0.1, 0.9) for _ in binding_lines]
+        context = _inject_signals(rng, filler, signals=binding_lines, positions=positions)
+
+        target_entity, target_value = rng.choice(bindings[:3])
+        question = f"What {_pick_value_noun(target_value)} belongs to {target_entity}?"
+        gold = target_value
+
+        tasks.append(
+            TaskRow(
+                task_id=f"synthetic-entity-binding-hard-{idx:03d}",
+                source_benchmark=BENCHMARK,
+                source_task="entity_binding_hard",
+                source_sample_id=str(idx),
+                context=context,
+                question=question,
+                gold_answer=gold,
+                gold_answer_aliases=[],
+                scorer=SCORER_EXACT_CI,
+                metadata={
+                    "generator": "entity_binding_hard",
+                    "entities": [e for e, _ in bindings],
+                    "target_entity": target_entity,
+                    "filler_sentences": filler_sentences,
+                },
+            )
+        )
+    return tasks
+
+
 def generate_entity_binding_tasks(
     *,
     count: int,

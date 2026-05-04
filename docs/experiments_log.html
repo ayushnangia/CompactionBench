@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CompactionBench — QB vs QA vs Weak-Hint</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; padding: 40px 24px; line-height: 1.6; }
+  .container { max-width: 800px; margin: 0 auto; }
+  h1 { font-size: 24px; color: #f0f6fc; margin-bottom: 4px; }
+  .subtitle { color: #8b949e; font-size: 13px; margin-bottom: 32px; }
+
+  .section { margin-bottom: 40px; }
+  .section-title { font-size: 17px; color: #58a6ff; margin-bottom: 8px; font-weight: 600; }
+  .section-desc { font-size: 13px; color: #8b949e; margin-bottom: 16px; }
+
+  .code-block { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 16px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; overflow-x: auto; }
+  .code-block .label { color: #8b949e; font-size: 11px; text-transform: uppercase; margin-bottom: 8px; display: block; }
+  .code-block .highlight { color: #58a6ff; }
+  .code-block .gold { color: #3fb950; }
+  .code-block .wrong { color: #f85149; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+  th { text-align: left; padding: 6px 10px; background: #161b22; color: #8b949e; font-weight: 500; border-bottom: 1px solid #21262d; }
+  td { padding: 6px 10px; border-bottom: 1px solid #21262d; }
+  tr:hover td { background: #161b22; }
+  .c { color: #3fb950; font-weight: 600; }
+  .w { color: #f85149; font-weight: 600; }
+  .m { color: #d29922; font-weight: 600; }
+
+  .insight { background: #1a2332; border-left: 3px solid #58a6ff; padding: 14px 18px; border-radius: 0 6px 6px 0; margin: 16px 0; font-size: 13px; }
+  .insight strong { color: #f0f6fc; }
+
+  .cards { display: flex; gap: 12px; margin: 16px 0; }
+  .card { flex: 1; background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; text-align: center; }
+  .card-label { font-size: 11px; color: #8b949e; text-transform: uppercase; }
+  .card-value { font-size: 28px; font-weight: 700; margin: 6px 0; }
+  .card-sub { font-size: 11px; color: #8b949e; }
+  .card.good { border-color: #238636; }
+  .card.bad { border-color: #da3633; }
+  .card.meh { border-color: #9e6a03; }
+
+  .divider { border: none; border-top: 1px solid #21262d; margin: 32px 0; }
+  .footer { font-size: 11px; color: #484f58; margin-top: 32px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>CompactionBench — Experiment Log</h1>
+<p class="subtitle">What happens when ~158,000 tokens of context are compressed into ~150?</p>
+
+<!-- ====== EXPERIMENT: QB vs QA vs WH ====== -->
+<div class="section">
+  <div class="section-title">Experiment 1: What does the compressor need to know?</div>
+  <div class="section-desc">A long context (~158k tokens) contains a multi-step update: "default model" changed from gpt-5.4-mini → gpt-5.3 → gpt-5.4 → claude-sonnet-4. The final confirmed value is "claude-sonnet-4". After compression to ~150 tokens, we test whether the compressed context still contains the answer. Three compression modes tested.</div>
+
+  <div class="code-block">
+    <span class="label">Input — Raw context (158,000 tokens, only signals shown)</span>
+    <span class="highlight">Initially, the default model was set to gpt-5.4-mini.</span><br>
+    <span class="highlight">Then the team changed the default model to gpt-5.3.</span><br>
+    <span class="highlight">Then the team changed the default model to gpt-5.4.</span><br>
+    <span class="gold">After final review, the default model is now claude-sonnet-4. This is the current confirmed value.</span><br>
+    <span style="color:#8b949e">[~158,000 tokens of filler text...]</span>
+  </div>
+
+  <table>
+    <tr><th>Mode</th><th>What compressor sees</th><th>Compressed output (preview)</th><th>Gold survives?</th></tr>
+    <tr>
+      <td><strong>QB</strong><br><span style="color:#8b949e;font-size:11px">query-blind</span></td>
+      <td style="font-size:12px">Just the context.<br>No question. No hint.</td>
+      <td style="font-size:11px">"Someone mentioned a useful VSCode extension...<br>The documentation was reviewed for accuracy...<br>Routine maintenance was performed..."</td>
+      <td class="w">✗ No<br><span style="font-size:11px;color:#8b949e">Kept filler, missed the update</span></td>
+    </tr>
+    <tr>
+      <td><strong>QA</strong><br><span style="color:#8b949e;font-size:11px">query-aware</span></td>
+      <td style="font-size:12px">Context + exact question:<br>"What is the current default model?"</td>
+      <td style="font-size:11px">"Initially the default model was set to...<br>After final review the default model is now<br>claude-sonnet-4"</td>
+      <td class="c">✓ Yes</td>
+    </tr>
+    <tr>
+      <td><strong>WH</strong><br><span style="color:#8b949e;font-size:11px">weak-hint</span></td>
+      <td style="font-size:12px">Context + task-type hint:<br>"Task type: stale update.<br>Find the relevant value."</td>
+      <td style="font-size:11px">"Then the team changed the default model to...<br>After final review the default model is now<br>claude-sonnet-4"</td>
+      <td class="c">✓ Yes</td>
+    </tr>
+  </table>
+
+  <div class="insight">
+    <strong>Finding:</strong> QB compresses filler because it has no relevance signal. QA preserves the answer because it knows the question. WH preserves the answer with only a task-type hint — it does not need the exact question.
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ====== EXPERIMENT: Scores ====== -->
+<div class="section">
+  <div class="section-title">Experiment 2: How does each mode perform at scale?</div>
+  <div class="section-desc">50 recalibrated tasks (25 stale-update hard, 25 entity-binding hard). gpt-5.4-mini. Each condition compresses context to ~150 tokens before the model answers. Partial results from 65 runs so far.</div>
+
+  <div class="cards">
+    <div class="card bad">
+      <div class="card-label">QB — blind</div>
+      <div class="card-value" style="color:#f85149">30%</div>
+      <div class="card-sub">3/10 correct</div>
+    </div>
+    <div class="card meh">
+      <div class="card-label">QA — sees question</div>
+      <div class="card-value" style="color:#d29922">50%</div>
+      <div class="card-sub">5/10 correct</div>
+    </div>
+    <div class="card good">
+      <div class="card-label">WH — task hint only</div>
+      <div class="card-value" style="color:#3fb950">71%</div>
+      <div class="card-sub">10/14 correct</div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Condition</th><th>What compressor knows</th><th>Stale-update</th><th>Entity binding</th><th>Total</th></tr>
+    <tr><td>Raw (no compression)</td><td>Everything</td><td>16/25</td><td>3/6</td><td class="m">19/31 (61%)</td></tr>
+    <tr><td>Entropy QB</td><td>Nothing</td><td>2/5</td><td>1/5</td><td class="w">3/10 (30%)</td></tr>
+    <tr><td>Entropy QA</td><td>Exact question</td><td>3/5</td><td>2/5</td><td class="m">5/10 (50%)</td></tr>
+    <tr><td>Weak-hint</td><td>Task type only</td><td>10/14</td><td>—</td><td class="c">10/14 (71%)</td></tr>
+  </table>
+
+  <div class="insight">
+    <strong>Finding:</strong> Task-type hints may outperform full questions. "Find the relevant value" guides the compressor to preserve answer-bearing facts without overfitting to a specific question word. Full batch needed to confirm.
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ====== EXPERIMENT: Retention Gap ====== -->
+<div class="section">
+  <div class="section-title">Experiment 3: The Retention-Accuracy Gap</div>
+  <div class="section-desc">From 228 existing runs (BABILong qa1-10: 120 runs, OOLONG-synth: 108 runs). Measures how often the gold answer appears anywhere in the model's context vs how often the model actually gives the correct answer.</div>
+
+  <table>
+    <tr><th>Benchmark</th><th>Gold in context</th><th>Correct answer</th><th>Gap</th><th>Interpretation</th></tr>
+    <tr><td>BABILong qa1-10</td><td>45.8%</td><td class="w">8.3%</td><td class="w">37.5pt</td><td>Model has info but cannot use it</td></tr>
+    <tr><td>BABILong qa11-20</td><td>41.9%</td><td class="w">14.7%</td><td class="w">27.2pt</td><td>Similar pattern</td></tr>
+    <tr><td>OOLONG-synth</td><td>54.6%</td><td class="c">46.3%</td><td class="c">8.3pt</td><td>Model uses what it has</td></tr>
+  </table>
+
+  <div class="insight">
+    <strong>Finding:</strong> BABILong asks for exact facts (names, places, objects). The model has the answer in context ~46% of the time but only answers correctly ~8% of the time. OOLONG asks for aggregation (counts, timelines). The model uses nearly everything it has. This gap is a diagnostic metric: large gap = exact memory failure, small gap = information is usable.
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ====== EXPERIMENT: Task Type Effects ====== -->
+<div class="section">
+  <div class="section-title">Experiment 4: Compression does not affect all tasks equally</div>
+  <div class="section-desc">15 synthetic tasks across 3 types, gpt-5.4-mini, 5 compression conditions.</div>
+
+  <table>
+    <tr><th>Task type</th><th>Example</th><th>All conditions</th><th>Why</th></tr>
+    <tr><td>Stale-update</td><td>"What is the current deployment branch?"<br>gold: "beta"</td><td class="c">100%</td><td>Exact value updates are easy to preserve</td></tr>
+    <tr><td>Entity binding</td><td>"What key belongs to Project Orion?"<br>gold: "K-1942"</td><td class="m">20%</td><td>Multiple similar entities confuse the model</td></tr>
+    <tr><td>Counting</td><td>"How many job_failed events?"<br>gold: "15"</td><td class="w">0%</td><td>Compression drops scattered events</td></tr>
+  </table>
+
+  <div class="insight">
+    <strong>Finding:</strong> All compression conditions tied at 40% overall. But hiding inside that tie: task type determines whether compression helps, hurts, or does nothing. You cannot say "compression improves accuracy" without specifying the task.
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ====== EXPERIMENT: gpt-5.4 counting ====== -->
+<div class="section">
+  <div class="section-title">Experiment 5: A smarter model cannot recover deleted information</div>
+  <div class="section-desc">15 scattered "job_failed" events in ~158k tokens. Task: count them (gold=15).</div>
+
+  <table>
+    <tr><th>Model</th><th>Condition</th><th>Guesses</th><th>Result</th></tr>
+    <tr><td>gpt-5.4-mini</td><td>Raw</td><td>12, 14, 10, 9, 13</td><td class="m">Close range</td></tr>
+    <tr><td>gpt-5.4</td><td>Raw</td><td>15, 15, 15, 15, 15</td><td class="c">Perfect</td></tr>
+    <tr><td>gpt-5.4</td><td>Compressed</td><td>3, 3, 3, 3, 3</td><td class="w">Wrong</td></tr>
+  </table>
+
+  <div class="insight">
+    <strong>Finding:</strong> gpt-5.4 counts perfectly with full context. After compression, it guesses 3 instead of 15. The compressor deleted the events, and model intelligence cannot recover them. Information loss is final.
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<div class="footer">
+  CompactionBench · github.com/ayushnangia/CompactionBench · April 2026
+</div>
+
+</div>
+</body>
+</html>

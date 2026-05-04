@@ -13,6 +13,7 @@ dependencies = [
     "openrouter>=0.9.1",
     "python-dotenv>=1.2.2",
     "huggingface_hub>=0.30.0",
+    "llmlingua>=0.2.2",
 ]
 
 [dependency-groups]

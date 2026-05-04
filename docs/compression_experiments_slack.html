@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CompactionBench — Compression Experiments</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; padding: 40px 24px; }
+  .container { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 22px; color: #f0f6fc; margin-bottom: 4px; }
+  .subtitle { color: #8b949e; font-size: 13px; margin-bottom: 32px; }
+
+  .section { margin-bottom: 36px; }
+  .section-title { font-size: 16px; color: #58a6ff; margin-bottom: 12px; font-weight: 600; }
+  .section-desc { font-size: 13px; color: #8b949e; margin-bottom: 12px; line-height: 1.5; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 16px; }
+  th { text-align: left; padding: 8px 12px; background: #161b22; color: #8b949e; font-weight: 500; border-bottom: 1px solid #21262d; }
+  td { padding: 8px 12px; border-bottom: 1px solid #21262d; }
+  tr:hover td { background: #161b22; }
+
+  .correct { color: #3fb950; font-weight: 600; }
+  .wrong { color: #f85149; font-weight: 600; }
+  .neutral { color: #d29922; }
+
+  .highlight { background: #1a2332; border-left: 3px solid #58a6ff; padding: 14px 18px; border-radius: 6px; margin-top: 16px; font-size: 13px; line-height: 1.6; }
+  .highlight strong { color: #f0f6fc; }
+
+  .big-number { font-size: 32px; font-weight: 700; color: #f0f6fc; }
+  .arrow { color: #f85149; font-size: 20px; margin: 0 8px; }
+  .metric-row { display: flex; gap: 24px; margin-bottom: 24px; }
+  .metric-box { background: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 16px 20px; flex: 1; }
+  .metric-label { font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .metric-value { font-size: 28px; font-weight: 700; color: #f0f6fc; }
+
+  .divider { border: none; border-top: 1px solid #21262d; margin: 32px 0; }
+  .footer { font-size: 11px; color: #484f58; margin-top: 32px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>CompactionBench</h1>
+  <p class="subtitle">What happens when AI context gets compressed?</p>
+
+  <!-- Experiment 1 -->
+  <div class="section">
+    <div class="section-title">Experiment 1 — Does compression need to know the question?</div>
+    <div class="section-desc">BABILong 5-task test (qa1, qa2, qa5, qa11, qa14). Gold answers are single words hidden in ~130k tokens of noise. Compressed to ~150 tokens before asking.</div>
+
+    <table>
+      <tr><th>Condition</th><th>qa1</th><th>qa2</th><th>qa5</th><th>qa11</th><th>qa14</th><th>Total</th></tr>
+      <tr>
+        <td>Raw (no compression)</td>
+        <td class="wrong">✗</td><td class="wrong">✗</td><td class="correct">✓</td><td class="correct">✓</td><td class="correct">✓</td>
+        <td class="neutral">3/5</td>
+      </tr>
+      <tr>
+        <td>Compressed (knows the question)</td>
+        <td class="correct">✓</td><td class="wrong">✗</td><td class="correct">✓</td><td class="wrong">✗</td><td class="correct">✓</td>
+        <td class="neutral">3/5</td>
+      </tr>
+      <tr>
+        <td>Compressed (does NOT know question)</td>
+        <td class="wrong">✗</td><td class="wrong">✗</td><td class="wrong">✗</td><td class="wrong">✗</td><td class="wrong">✗</td>
+        <td class="wrong">0/5</td>
+      </tr>
+    </table>
+
+    <div class="highlight">
+      <strong>Takeaway:</strong> Compression with the question = matches normal performance. Without the question = <strong>completely blind</strong>. The compressor kept the wrong facts every single time when it did not know what to look for.
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- Experiment 2 -->
+  <div class="section">
+    <div class="section-title">Experiment 2 — Can a smarter model recover lost information?</div>
+    <div class="section-desc">15 scattered "job_failed" events hidden in ~158k tokens of filler. Task: count them.</div>
+
+    <div class="metric-row">
+      <div class="metric-box">
+        <div class="metric-label">gpt-5.4-mini raw</div>
+        <div class="metric-value" style="color:#f85149">0/5</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-label">gpt-5.4 raw</div>
+        <div class="metric-value">5/5</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-label">gpt-5.4 compressed</div>
+        <div class="metric-value" style="color:#f85149">0/5</div>
+      </div>
+    </div>
+
+    <table>
+      <tr><th>Model</th><th>Condition</th><th>Answers (gold = 15)</th></tr>
+      <tr><td>gpt-5.4-mini</td><td>Raw context</td><td class="wrong">9, 13, 14, 10, 12</td></tr>
+      <tr><td>gpt-5.4</td><td>Raw context</td><td class="correct">15, 15, 15, 15, 15</td></tr>
+      <tr><td>gpt-5.4</td><td>Compressed context</td><td class="wrong">3, 3, 3, 3, 3</td></tr>
+    </table>
+
+    <div class="highlight">
+      <strong>Takeaway:</strong> GPT-5.4 counts perfectly with full context. After compression, it fails completely — guessing 3 instead of 15. <strong>A stronger model cannot recover what the compressor deleted.</strong> Information loss is final.
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="footer">
+    CompactionBench · github.com/ayushnangia/CompactionBench · 28 Apr 2026
+  </div>
+
+</div>
+</body>
+</html>

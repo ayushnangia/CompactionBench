@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CompactionBench — Task-Type Effects & Retention Metric</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; padding: 40px 24px; }
+  .container { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 22px; color: #f0f6fc; margin-bottom: 4px; }
+  .subtitle { color: #8b949e; font-size: 13px; margin-bottom: 32px; }
+
+  .section { margin-bottom: 36px; }
+  .section-title { font-size: 16px; color: #58a6ff; margin-bottom: 12px; font-weight: 600; }
+  .section-desc { font-size: 13px; color: #8b949e; margin-bottom: 16px; line-height: 1.5; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 16px; }
+  th { text-align: left; padding: 8px 12px; background: #161b22; color: #8b949e; font-weight: 500; border-bottom: 1px solid #21262d; }
+  td { padding: 8px 12px; border-bottom: 1px solid #21262d; }
+  tr:hover td { background: #161b22; }
+
+  .good { color: #3fb950; font-weight: 600; }
+  .bad { color: #f85149; font-weight: 600; }
+  .meh { color: #d29922; font-weight: 600; }
+
+  .highlight { background: #1a2332; border-left: 3px solid #58a6ff; padding: 14px 18px; border-radius: 6px; margin-top: 16px; font-size: 13px; line-height: 1.6; }
+  .highlight strong { color: #f0f6fc; }
+
+  .cards { display: flex; gap: 16px; margin-bottom: 24px; }
+  .card { flex: 1; background: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 20px; text-align: center; }
+  .card-label { font-size: 12px; color: #8b949e; margin-bottom: 6px; }
+  .card-value { font-size: 36px; font-weight: 700; }
+  .card-sub { font-size: 12px; color: #8b949e; margin-top: 4px; }
+
+  .bar-group { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 24px; }
+  .bar-col { flex: 1; text-align: center; }
+  .bar-label { font-size: 12px; color: #8b949e; margin-bottom: 6px; }
+  .bar-wrapper { display: flex; gap: 4px; justify-content: center; align-items: flex-end; height: 100px; }
+  .bar { width: 28px; border-radius: 4px 4px 0 0; position: relative; }
+  .bar-ret { background: #58a6ff; opacity: 0.4; }
+  .bar-acc { background: #1f6feb; }
+  .bar-val { font-size: 10px; position: absolute; top: -16px; width: 100%; text-align: center; color: #c9d1d9; }
+  .bar-leg { display: flex; gap: 12px; justify-content: center; margin-top: 8px; font-size: 11px; color: #8b949e; }
+  .bar-leg span { display: flex; align-items: center; gap: 4px; }
+  .bar-leg .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+  .divider { border: none; border-top: 1px solid #21262d; margin: 32px 0; }
+  .footer { font-size: 11px; color: #484f58; margin-top: 32px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>CompactionBench</h1>
+  <p class="subtitle">Compression does not affect all tasks equally</p>
+
+  <!-- Task-type effects -->
+  <div class="section">
+    <div class="section-title">Experiment — Task-type effects under compression</div>
+    <div class="section-desc">15 synthetic tasks (~158k tokens), 5 per type. gpt-5.4-mini across 5 compression conditions. Same conditions, very different outcomes.</div>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-label">Stale-update</div>
+        <div class="card-value good">100%</div>
+        <div class="card-sub">25/25 across all conditions</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Entity binding</div>
+        <div class="card-value meh">20%</div>
+        <div class="card-sub">5/25 — compression neutral</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Counting</div>
+        <div class="card-value bad">0%</div>
+        <div class="card-sub">0/25 — compression destroys it</div>
+      </div>
+    </div>
+
+    <table>
+      <tr><th>Condition</th><th>Stale-update</th><th>Entity binding</th><th>Counting</th><th>Total</th></tr>
+      <tr><td>auto_raw</td><td class="good">5/5</td><td class="meh">1/5</td><td class="bad">0/5</td><td>6/15</td></tr>
+      <tr><td>entropy (query-blind)</td><td class="good">5/5</td><td class="meh">1/5</td><td class="bad">0/5</td><td>6/15</td></tr>
+      <tr><td>entropy (query-aware)</td><td class="good">5/5</td><td class="meh">1/5</td><td class="bad">0/5</td><td>6/15</td></tr>
+      <tr><td>static (query-blind)</td><td class="good">5/5</td><td class="meh">1/5</td><td class="bad">0/5</td><td>6/15</td></tr>
+      <tr><td>static (query-aware)</td><td class="good">5/5</td><td class="meh">1/5</td><td class="bad">0/5</td><td>6/15</td></tr>
+    </table>
+
+    <div class="highlight">
+      <strong>Takeaway:</strong> All conditions tied at 40% overall. But by task type: compression helps exact updates, is useless on binding, and <strong>destroys counting</strong>. Total accuracy hides the real story — the task type determines whether compression helps or hurts.
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- Retention metric -->
+  <div class="section">
+    <div class="section-title">Metric — Retention vs Accuracy gap</div>
+    <div class="section-desc">From existing batch data. "Gold in context" = the answer appears somewhere in what the model saw. "Correct answer" = the model actually got it right. The gap is what compaction destroyed.</div>
+
+    <div class="bar-group">
+      <div class="bar-col">
+        <div class="bar-label">BABILong<br><span style="font-size:10px;color:#8b949e">exact facts</span></div>
+        <div class="bar-wrapper">
+          <div class="bar bar-ret" style="height:92px"><div class="bar-val">46%</div></div>
+          <div class="bar bar-acc" style="height:17px"><div class="bar-val" style="color:#f85149">8%</div></div>
+        </div>
+        <div class="bar-leg">
+          <span><span class="swatch" style="background:#58a6ff;opacity:0.4"></span> Gold in context</span>
+          <span><span class="swatch" style="background:#1f6feb"></span> Correct</span>
+        </div>
+        <div style="margin-top:8px;font-size:20px;font-weight:700;color:#f85149;">37pt gap</div>
+      </div>
+      <div class="bar-col">
+        <div class="bar-label">OOLONG<br><span style="font-size:10px;color:#8b949e">aggregation</span></div>
+        <div class="bar-wrapper">
+          <div class="bar bar-ret" style="height:92px"><div class="bar-val">55%</div></div>
+          <div class="bar bar-acc" style="height:77px"><div class="bar-val" style="color:#3fb950">46%</div></div>
+        </div>
+        <div class="bar-leg">
+          <span><span class="swatch" style="background:#58a6ff;opacity:0.4"></span> Gold in context</span>
+          <span><span class="swatch" style="background:#1f6feb"></span> Correct</span>
+        </div>
+        <div style="margin-top:8px;font-size:20px;font-weight:700;color:#3fb950;">8pt gap</div>
+      </div>
+    </div>
+
+    <table>
+      <tr><th>Benchmark</th><th>Gold in context</th><th>Correct answer</th><th>Gap</th></tr>
+      <tr><td>BABILong qa1-10</td><td>45.8%</td><td>8.3%</td><td class="bad">37.5pt</td></tr>
+      <tr><td>BABILong qa11-20</td><td>41.9%</td><td>14.7%</td><td class="bad">27.2pt</td></tr>
+      <tr><td>OOLONG-synth</td><td>54.6%</td><td>46.3%</td><td class="good">8.3pt</td></tr>
+    </table>
+
+    <div class="highlight">
+      <strong>Takeaway:</strong> BABILong: the model <strong>has</strong> the answer 46% of the time but only <strong>answers correctly</strong> 8% of the time — a 37-point gap. OOLONG: the model uses almost everything it keeps. <strong>Exact memory degrades under compaction while aggregation survives.</strong> This gap is a clean metric for diagnosing what compression destroys.
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="footer">
+    CompactionBench · github.com/ayushnangia/CompactionBench · 28 Apr 2026
+  </div>
+
+</div>
+</body>
+</html>

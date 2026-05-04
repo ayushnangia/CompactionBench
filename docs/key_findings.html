@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CompactionBench — Key Findings</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; padding: 40px 24px; line-height: 1.6; }
+  .container { max-width: 800px; margin: 0 auto; }
+  h1 { font-size: 24px; color: #f0f6fc; margin-bottom: 4px; }
+  .subtitle { color: #8b949e; font-size: 13px; margin-bottom: 36px; }
+
+  .finding { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 24px; margin-bottom: 28px; }
+  .finding-num { font-size: 11px; color: #58a6ff; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .finding-title { font-size: 18px; color: #f0f6fc; font-weight: 700; margin-bottom: 4px; }
+  .finding-sub { font-size: 13px; color: #8b949e; margin-bottom: 16px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 12px 0; }
+  th { text-align: left; padding: 8px 12px; background: #0d1117; color: #8b949e; font-weight: 500; border-bottom: 1px solid #21262d; }
+  td { padding: 8px 12px; border-bottom: 1px solid #21262d; }
+  .c { color: #3fb950; font-weight: 600; }
+  .w { color: #f85149; font-weight: 600; }
+  .m { color: #d29922; font-weight: 600; }
+
+  .big-row { display: flex; gap: 12px; margin: 12px 0; }
+  .big-num { flex: 1; text-align: center; padding: 16px 12px; background: #0d1117; border: 1px solid #21262d; border-radius: 8px; }
+  .big-num .val { font-size: 36px; font-weight: 700; }
+  .big-num .lab { font-size: 11px; color: #8b949e; margin-top: 4px; }
+
+  .insight { background: #1a2332; border-left: 3px solid #58a6ff; padding: 14px 18px; border-radius: 0 6px 6px 0; margin: 16px 0; font-size: 13px; }
+  .insight strong { color: #f0f6fc; }
+
+  .example { background: #0d1117; border: 1px solid #21262d; border-radius: 6px; padding: 14px 16px; margin: 8px 0; font-size: 12px; font-family: 'SF Mono', monospace; }
+  .example .pre { color: #8b949e; }
+  .example .gold { color: #3fb950; }
+  .example .wrong { color: #f85149; }
+
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; margin-right: 6px; }
+  .tag-red { background: #3a1e1e; color: #f85149; }
+  .tag-green { background: #1a3a1e; color: #3fb950; }
+  .tag-orange { background: #3a2e1a; color: #d29922; }
+
+  .footer { font-size: 11px; color: #484f58; margin-top: 40px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>CompactionBench</h1>
+<p class="subtitle">What happens when AI context gets too long and the system compresses it? Five findings from 648 Codex runs.</p>
+
+<!-- ====== 1 ====== -->
+<div class="finding">
+  <div class="finding-num">Finding 1</div>
+  <div class="finding-title">The Retention-Accuracy Gap</div>
+  <div class="finding-sub">A metric that separates memory loss from reasoning failure. How often the answer exists in context vs how often the model actually gives it.</div>
+
+  <div class="big-row">
+    <div class="big-num">
+      <div class="val" style="color:#f85149">37pt</div>
+      <div class="lab">BABILong gap</div>
+    </div>
+    <div class="big-num">
+      <div class="val" style="color:#3fb950">8pt</div>
+      <div class="lab">OOLONG gap</div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Benchmark</th><th>Gold in context</th><th>Correct answer</th><th>Gap</th></tr>
+    <tr><td>BABILong qa1-10</td><td>45.8%</td><td class="w">8.3%</td><td class="w">37.5pt</td></tr>
+    <tr><td>BABILong qa11-20</td><td>41.9%</td><td class="w">14.7%</td><td class="w">27.2pt</td></tr>
+    <tr><td>OOLONG-synth</td><td>54.6%</td><td class="c">46.3%</td><td class="c">8.3pt</td></tr>
+  </table>
+
+  <div class="insight">
+    <strong>What this means:</strong> For exact-fact questions (Where is Mary? What object does she have?), the model has the answer in its context nearly half the time but can only retrieve it 8% of the time. For big-picture questions (counts, timelines, patterns), the model uses almost everything it has. Compaction destroys exact memory while preserving aggregate understanding.
+  </div>
+</div>
+
+<!-- ====== 2 ====== -->
+<div class="finding">
+  <div class="finding-num">Finding 2</div>
+  <div class="finding-title">QB vs QA vs Weak-Hint</div>
+  <div class="finding-sub">Three ways to compress the same context. What does the compressor need to know to preserve the right information?</div>
+
+  <table>
+    <tr><th>Mode</th><th>What compressor knows</th><th>Stale-update</th><th>Entity bind</th><th>Total</th></tr>
+    <tr><td>Raw (no compression)</td><td>Everything</td><td>16/25</td><td>3/6</td><td class="m">19/31 (61%)</td></tr>
+    <tr><td>QA — knows the question</td><td>"What is the current X?"</td><td>3/5</td><td>2/5</td><td class="m">5/10 (50%)</td></tr>
+    <tr><td>WH — task hint only</td><td>"Find the relevant value"</td><td>18/25</td><td>5/25</td><td class="m">23/50 (46%)</td></tr>
+    <tr><td>QB — knows nothing</td><td>Nothing</td><td>2/5</td><td>1/5</td><td class="w">3/10 (30%)</td></tr>
+  </table>
+
+  <div class="example">
+    <span class="pre">Input: </span>Initially the model was gpt-5.4-mini. Changed to gpt-5.3. Changed to gpt-5.4. <span class="gold">Final: claude-sonnet-4.</span><br>
+    <span class="pre">QB compressed: </span><span class="wrong">"Someone mentioned a VSCode extension..."</span> ← kept filler<br>
+    <span class="pre">QA compressed: </span><span class="gold">"After final review the model is now claude-sonnet-4"</span> ← kept answer<br>
+    <span class="pre">WH compressed: </span><span class="gold">"Final review the model is now claude-sonnet-4"</span> ← also kept answer
+  </div>
+
+  <div class="insight">
+    <strong>What this means:</strong> You do not need the exact question. A task-type hint ("find the relevant value") is enough to guide compression. This matters for real agents because they do not know what question will be asked later — but they do know the task type. <strong>Weak-hint compression may be a practical path to better agent memory.</strong>
+  </div>
+</div>
+
+<!-- ====== 3 ====== -->
+<div class="finding">
+  <div class="finding-num">Finding 3</div>
+  <div class="finding-title">Recalibrated Benchmark</div>
+  <div class="finding-sub">The original tasks were at wrong difficulty — 100% or 0% accuracy. We fixed the dynamic range so compression effects become visible.</div>
+
+  <div class="big-row">
+    <div class="big-num">
+      <div class="val" style="color:#f85149">100%</div>
+      <div class="lab">Old stale-update (ceiling)</div>
+    </div>
+    <div class="big-num">
+      <div class="val" style="color:#3fb950">61%</div>
+      <div class="lab">New stale-update (sweet spot)</div>
+    </div>
+    <div class="big-num">
+      <div class="val" style="color:#d29922">20%</div>
+      <div class="lab">Old entity binding (floor)</div>
+    </div>
+    <div class="big-num">
+      <div class="val" style="color:#d29922">50%</div>
+      <div class="lab">New entity binding</div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Task</th><th>Old design</th><th>Old acc</th><th>New design</th><th>New acc</th></tr>
+    <tr><td>Stale-update</td><td>One old→new change</td><td class="c">100%</td><td>4 intermediate values + distractor</td><td class="m">61%</td></tr>
+    <tr><td>Entity binding</td><td>3 distinct entities</td><td class="w">20%</td><td>5 confusing names (Orion/Orin/Oren)</td><td class="m">50%</td></tr>
+  </table>
+
+  <div class="insight">
+    <strong>What this means:</strong> Before recalibration, all compression conditions tied — the effect was invisible because tasks were at ceiling or floor. After making stale-update harder and entity binding tractable, we can see the compression gradient. <strong>Task calibration was the load-bearing fix that unblocked everything else.</strong>
+  </div>
+</div>
+
+<!-- ====== 4 ====== -->
+<div class="finding">
+  <div class="finding-num">Finding 4</div>
+  <div class="finding-title">Failure Taxonomy</div>
+  <div class="finding-sub">184 failures from 648 runs. Compaction failures are not random — they cluster into predictable categories.</div>
+
+  <table>
+    <tr><th>Category</th><th>Count</th><th>Example</th><th>Mechanism</th></tr>
+    <tr><td><span class="tag tag-red">Fact dropped</span></td><td class="w">22</td><td>"Not specified in the context"</td><td>Compressor missed the answer-bearing fact</td></tr>
+    <tr><td><span class="tag tag-orange">Wrong location</span></td><td class="m">12</td><td>"bedroom" instead of "bathroom"</td><td>Multiple similar locations confuse</td></tr>
+    <tr><td><span class="tag tag-red">Counting error</span></td><td class="w">15</td><td>"3" instead of "15"</td><td>Compressor deleted events</td></tr>
+    <tr><td><span class="tag tag-orange">Stale value</span></td><td class="m">45</td><td>"beta" instead of "epsilon"</td><td>Picked intermediate update</td></tr>
+    <tr><td><span class="tag tag-red">Other wrong</span></td><td class="w">90</td><td>"a child" instead of "nothing"</td><td>Could not locate fact</td></tr>
+  </table>
+
+  <div class="insight">
+    <strong>What this means:</strong> You can do a differential diagnosis on compaction failures. "Not specified" means the compressor dropped it. Wrong location means entity confusion. Wrong count means broad coverage was needed. Stale value means the model tracks updates poorly. <strong>Each failure type suggests a different fix.</strong>
+  </div>
+</div>
+
+<!-- ====== 5 ====== -->
+<div class="finding">
+  <div class="finding-num">Finding 5</div>
+  <div class="finding-title">Smarter Model ≠ Better Compaction</div>
+  <div class="finding-sub">gpt-5.4 counts 15 scattered job_failed events perfectly with full context. After compression, 0% accuracy.</div>
+
+  <div class="big-row">
+    <div class="big-num">
+      <div class="val" style="color:#3fb950">5/5</div>
+      <div class="lab">gpt-5.4 raw context</div>
+    </div>
+    <div class="big-num">
+      <div class="val" style="color:#f85149">0/5</div>
+      <div class="lab">gpt-5.4 compressed</div>
+    </div>
+    <div class="big-num">
+      <div class="val" style="color:#f85149">0/5</div>
+      <div class="lab">gpt-5.4-mini raw</div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Model</th><th>Context</th><th>Guesses (gold=15)</th><th>Result</th></tr>
+    <tr><td>gpt-5.4-mini</td><td>Raw</td><td>12, 14, 10, 9, 13</td><td class="m">Close range</td></tr>
+    <tr><td>gpt-5.4</td><td>Raw</td><td>15, 15, 15, 15, 15</td><td class="c">Perfect</td></tr>
+    <tr><td>gpt-5.4</td><td>Compressed</td><td>3, 3, 3, 3, 3</td><td class="w">Completely wrong</td></tr>
+  </table>
+
+  <div class="insight">
+    <strong>What this means:</strong> Intelligence cannot recover deleted information. The compressor kept 3 events and dropped the other 12. gpt-5.4 correctly counts the 3 it sees. This is not a reasoning failure — it is an information access failure. <strong>A more capable model gives the correct answer to the wrong question.</strong> This suggests future agent reliability depends more on compression quality than model capability.
+  </div>
+</div>
+
+<div class="footer">
+  CompactionBench · github.com/ayushnangia/CompactionBench · 648 Codex runs · April 2026
+</div>
+
+</div>
+</body>
+</html>
