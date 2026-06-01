@@ -17,7 +17,16 @@ from pydantic import BaseModel, ConfigDict, Field
 
 CompactionMode = Literal["off", "auto"]
 HarnessName = Literal["claude_code", "codex"]
-SourceBenchmark = Literal["ruler", "babilong", "longbench_v2", "oolong"]
+SourceBenchmark = Literal[
+    "ruler",
+    "babilong",
+    "longbench_v2",
+    "oolong",
+    "lme",
+    "clb",
+    "synthetic",
+    "swe_chat",
+]
 Scorer = Literal[
     "exact",
     "exact_ci",
