@@ -871,6 +871,17 @@ Committed/pushed:
 - commit: `288d0dd` — `Record all-length BABILong hierarchy results`
 - URL: `https://github.com/ayushnangia/CompactionBench/commit/288d0dd`
 
-## Next command
+## Final summary and stopping point
 
-Either start OOLONG counter hierarchy, or write the final hierarchy execution summary and stop the loop.
+Final summary written:
+
+- `docs/work/hierarchical_memory_final_summary_2026-06-02.md`
+
+Decision:
+
+- Stop this execution loop here. The synthetic hierarchy path and BABILong state-table validation are complete enough to share.
+- Do not start OOLONG in this same loop; it should be a separate follow-up with its own counter/extractor canaries.
+
+If reopened, next project:
+
+- OOLONG counter hierarchy for roll/spell aggregate transcript questions.
