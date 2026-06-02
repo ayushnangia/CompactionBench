@@ -774,6 +774,11 @@ Verification:
 - `uv run pytest -q tests/test_babilong_hierarchy.py` -> 3 passed
 - `uv run pytest -q` -> 68 passed
 
+Committed/pushed:
+
+- commit: `b720842` — `Scale BABILong hierarchy canary results`
+- URL: `https://github.com/ayushnangia/CompactionBench/commit/b720842`
+
 ## Next command
 
 Either scale BABILong qa11-qa14 to 512k/1M, or start the OOLONG counter hierarchy for aggregate transcript questions.
