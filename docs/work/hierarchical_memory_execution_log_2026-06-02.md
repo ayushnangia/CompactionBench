@@ -621,6 +621,15 @@ Main one-liner from that note:
 
 > On single-fact lookup, grep/flat retrieval is very hard to beat. But on aggregate memory under an equal packet budget, hierarchy separated cleanly: flat raw retrieval got 3–5/20, virtual context got 14/20 with ~9k evidence tokens, and the hierarchy packet got 20/20 with ~142 tokens by carrying consolidated L2 state.
 
+## Commit pushed
+
+Relevant code/docs were committed and pushed:
+
+- commit: `b70b371` — `Add hierarchical memory benchmark and budget-pressure results`
+- URL: `https://github.com/ayushnangia/CompactionBench/commit/b70b371`
+
+Generated task files and run artifacts remain local/ignored; commands in this log regenerate them.
+
 ## Next command
 
-Clean up and commit/push relevant code/docs, excluding ignored generated data/artifacts unless explicitly needed.
+If continuing, run the full 10-stream mixed panel or start converting this synthetic canary into a real BABILong/OOLONG state-table hierarchy experiment.
