@@ -52,6 +52,9 @@ def _relaxed_one(answer: str, gold: str) -> float:
         match = re.search(r"\b([a-h])\b", answer_clean)
         return float(bool(match and match.group(1) == gold_clean))
 
+    if gold_clean in {"unknown", "not mentioned", "not enough information"} and _is_unknown_or_no_record_answer(answer_clean):
+        return 1.0
+
     if gold_clean == answer_clean:
         return 1.0
     if _drop_articles(gold_clean) == _drop_articles(answer_clean):
@@ -59,6 +62,14 @@ def _relaxed_one(answer: str, gold: str) -> float:
     if len(gold_clean) >= 3 and gold_clean in answer_clean:
         return 1.0
     return 0.0
+
+
+def _is_unknown_or_no_record_answer(value: str) -> bool:
+    return bool(
+        re.search(r"\b(unknown|not enough information|cannot be determined|can not be determined|can't be determined)\b", value)
+        or re.search(r"\b(no|not)\b.*\b(record|entry|mention|mentioned|specified|given|present|available|found|contain|contains|recorded)\b", value)
+        or re.search(r"\bdoes not\b.*\b(contain|mention|include)\b", value)
+    )
 
 
 def _clean_short_answer(value: str) -> str:
@@ -97,6 +108,8 @@ def main() -> int:
             arm = str(rec.metadata.get("arm") or "unknown")
             original_task_id = str(rec.metadata.get("original_task_id") or rec.task_id)
             answer = rec.final_answer_parsed.answer if rec.final_answer_parsed else None
+            memory_meta = rec.metadata.get("hierarchical_memory") or rec.metadata.get("virtual_context") or {}
+            evidence_tokens = int(memory_meta.get("evidence_tokens_est") or memory_meta.get("notes_tokens_est") or 0) if isinstance(memory_meta, dict) else 0
             score = score_value_one(scorer=rec.scorer, gold=rec.gold_answer, gold_aliases=rec.gold_answer_aliases, answer=answer)
             relaxed_score = relaxed_score_value(scorer=rec.scorer, gold=rec.gold_answer, gold_aliases=rec.gold_answer_aliases, answer=answer)
             rows.append(
@@ -107,6 +120,8 @@ def main() -> int:
                     "benchmark": rec.source_benchmark,
                     "panel_family": str(rec.metadata.get("panel_family") or ""),
                     "source_task": rec.source_task,
+                    "query_type": str(rec.metadata.get("query_type") or rec.metadata.get("question_type") or rec.source_task),
+                    "expected_tier": str(rec.metadata.get("expected_tier") or ""),
                     "length": str(rec.metadata.get("length_label") or rec.metadata.get("episode_count") or "unknown"),
                     "scorer": rec.scorer,
                     "gold_answer": rec.gold_answer,
@@ -120,6 +135,7 @@ def main() -> int:
                     "tool_events": len(rec.tool_events),
                     "compaction_events": len(rec.compaction_events),
                     "duration_s": rec.duration_s or 0.0,
+                    "memory_evidence_tokens_est": evidence_tokens,
                     "path": str(path),
                 }
             )
@@ -154,19 +170,29 @@ def summarize(rows: list[dict[str, Any]], *, baseline_arm: str = "full_context")
             "avg_tool_events": sum(int(r["tool_events"]) for r in bucket) / n if n else 0.0,
             "avg_compaction_events": sum(int(r["compaction_events"]) for r in bucket) / n if n else 0.0,
             "avg_duration_s": sum(float(r["duration_s"]) for r in bucket) / n if n else 0.0,
+            "avg_memory_evidence_tokens_est": sum(int(r.get("memory_evidence_tokens_est") or 0) for r in bucket) / n if n else 0.0,
         }
 
     by_arm = group_stats(rows, lambda r: (r["arm"],), stats)
     by_arm_benchmark = group_stats(rows, lambda r: (r["arm"], r["benchmark"]), stats)
     by_arm_family = group_stats(rows, lambda r: (r["arm"], r["panel_family"]), stats)
     by_arm_task = group_stats(rows, lambda r: (r["arm"], r["source_task"]), stats)
+    by_arm_query_type = group_stats(rows, lambda r: (r["arm"], r["query_type"]), stats)
 
     paired_by_task = defaultdict(dict)
     for r in rows:
         paired_by_task[r["original_task_id"]][r["arm"]] = r
 
-    pair_summary = pairwise_summary(paired_by_task, baseline_arm, "grep_file")
     arms_present = sorted({str(r["arm"]) for r in rows})
+    if baseline_arm != "grep_file" and "grep_file" in arms_present:
+        default_compare_arm = "grep_file"
+    elif baseline_arm != "hierarchy_packet" and "hierarchy_packet" in arms_present:
+        default_compare_arm = "hierarchy_packet"
+    elif "hierarchy_packet" in arms_present:
+        default_compare_arm = "hierarchy_packet"
+    else:
+        default_compare_arm = next((arm for arm in arms_present if arm != baseline_arm), "grep_file")
+    pair_summary = pairwise_summary(paired_by_task, baseline_arm, default_compare_arm)
     pairwise_vs_baseline = {
         arm: pairwise_summary(paired_by_task, baseline_arm, arm)
         for arm in arms_present
@@ -179,6 +205,7 @@ def summarize(rows: list[dict[str, Any]], *, baseline_arm: str = "full_context")
         "by_arm_benchmark": by_arm_benchmark,
         "by_arm_family": by_arm_family,
         "by_arm_task": by_arm_task,
+        "by_arm_query_type": by_arm_query_type,
         "baseline_arm": baseline_arm,
         "paired": pair_summary,
         "pairwise_vs_baseline": pairwise_vs_baseline,
@@ -306,19 +333,22 @@ def write_report(path: Path, title: str, summary: dict[str, Any]) -> None:
         lines.append(
             f"- `{row['key_1']}`: `{row['correct']}/{row['n']}` strict-correct ({row['accuracy']:.1%}), "
             f"`{row.get('relaxed_correct', 0)}/{row['n']}` relaxed-correct ({row.get('relaxed_accuracy', 0.0):.1%}), "
-            f"parse `{row['parse_ok']}/{row['n']}`, avg tools/run `{row['avg_tool_events']:.2f}`, avg duration `{row['avg_duration_s']:.1f}s`"
+            f"parse `{row['parse_ok']}/{row['n']}`, avg tools/run `{row['avg_tool_events']:.2f}`, "
+            f"avg evidence `{row.get('avg_memory_evidence_tokens_est', 0.0):.0f}` tok, avg duration `{row['avg_duration_s']:.1f}s`"
         )
     lines.append("")
 
     lines.append("## Paired comparison")
     lines.append("")
+    lines.append(f"- baseline arm: `{paired['baseline_arm']}`")
+    lines.append(f"- compare arm: `{paired['compare_arm']}`")
     lines.append(f"- pairs: `{paired['n_pairs']}`")
-    lines.append(f"- full-context wins by score: `{paired['full_context_wins']}`")
-    lines.append(f"- grep-file wins by score: `{paired['grep_file_wins']}`")
+    lines.append(f"- baseline wins by score: `{paired['baseline_wins']}`")
+    lines.append(f"- compare wins by score: `{paired['compare_wins']}`")
     lines.append(f"- ties by score: `{paired['ties']}`")
     lines.append(f"- both correct: `{paired['both_correct']}`")
-    lines.append(f"- full-context only correct: `{paired['full_only_correct']}`")
-    lines.append(f"- grep-file only correct: `{paired['grep_only_correct']}`")
+    lines.append(f"- baseline only correct: `{paired['baseline_only_correct']}`")
+    lines.append(f"- compare only correct: `{paired['compare_only_correct']}`")
     lines.append(f"- both wrong: `{paired['both_wrong']}`")
     lines.append("")
 
@@ -337,6 +367,14 @@ def write_report(path: Path, title: str, summary: dict[str, Any]) -> None:
             )
         lines.append("")
 
+    query_rows = summary.get("by_arm_query_type") or []
+    if query_rows:
+        lines.append("## By query type and arm")
+        lines.append("")
+        for row in query_rows:
+            lines.append(f"- `{row['key_1']}` / `{row['key_2']}`: `{row['correct']}/{row['n']}` strict ({row['accuracy']:.1%}), `{row.get('relaxed_correct', 0)}/{row['n']}` relaxed ({row.get('relaxed_accuracy', 0.0):.1%})")
+        lines.append("")
+
     lines.append("## By benchmark and arm")
     lines.append("")
     for row in summary["by_arm_benchmark"]:
@@ -347,8 +385,8 @@ def write_report(path: Path, title: str, summary: dict[str, Any]) -> None:
     lines.append("")
     for row in paired["by_benchmark"]:
         lines.append(
-            f"- `{row['benchmark']}`: pairs `{row['n_pairs']}`, full-only `{row['full_only_correct']}`, "
-            f"grep-only `{row['grep_only_correct']}`, both-correct `{row['both_correct']}`, both-wrong `{row['both_wrong']}`"
+            f"- `{row['benchmark']}`: pairs `{row['n_pairs']}`, baseline-only `{row['baseline_only_correct']}`, "
+            f"compare-only `{row['compare_only_correct']}`, both-correct `{row['both_correct']}`, both-wrong `{row['both_wrong']}`"
         )
     lines.append("")
 
@@ -356,8 +394,8 @@ def write_report(path: Path, title: str, summary: dict[str, Any]) -> None:
     lines.append("")
     for row in paired["by_family"]:
         lines.append(
-            f"- `{row['panel_family']}`: pairs `{row['n_pairs']}`, full-only `{row['full_only_correct']}`, "
-            f"grep-only `{row['grep_only_correct']}`, both-correct `{row['both_correct']}`, both-wrong `{row['both_wrong']}`"
+            f"- `{row['panel_family']}`: pairs `{row['n_pairs']}`, baseline-only `{row['baseline_only_correct']}`, "
+            f"compare-only `{row['compare_only_correct']}`, both-correct `{row['both_correct']}`, both-wrong `{row['both_wrong']}`"
         )
     lines.append("")
     path.write_text("\n".join(lines))
