@@ -704,6 +704,11 @@ Verification:
 
 - `uv run pytest -q` -> 68 passed
 
+Committed/pushed:
+
+- commit: `f2aea4a` — `Add BABILong state-table hierarchy canary`
+- URL: `https://github.com/ayushnangia/CompactionBench/commit/f2aea4a`
+
 ## Next command
 
 Scale `babilong_state_packet` on qa11-qa14 across more samples/lengths and compare against `grep_file` / `virtual_context`, or start the OOLONG counter hierarchy.
