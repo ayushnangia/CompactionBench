@@ -779,6 +779,93 @@ Committed/pushed:
 - commit: `b720842` — `Scale BABILong hierarchy canary results`
 - URL: `https://github.com/ayushnangia/CompactionBench/commit/b720842`
 
+## Iteration 9: BABILong qa11-qa14 at 512k/1M and all-length summary
+
+Scaled BABILong state-table panel further:
+
+- `data/benchmarks/babilong_state_hierarchy_qa11_14_512k_1m_s3.jsonl`
+- 24 tasks = qa11-qa14 x 3 samples x 2 lengths (`512k`, `1M`).
+- Arms: `grep_file`, `virtual_context`, `babilong_state_packet`.
+
+Precheck:
+
+- Built state packets for all 24 tasks and verified the gold answer appeared in the extracted packet.
+- Precheck failures: 0.
+
+Run:
+
+```bash
+uv run python scripts/run_lossless_vs_grep_codex_parallel.py \
+  --tasks data/benchmarks/babilong_state_hierarchy_qa11_14_512k_1m_s3.jsonl \
+  --root-dir artifacts/batches/babilong_state_hierarchy_qa11_14_512k_1m_s3_72 \
+  --arm grep_file \
+  --arm virtual_context \
+  --arm babilong_state_packet \
+  --model gpt-5.4-mini \
+  --reasoning-effort low \
+  --verbosity low \
+  --timeout-s 420 \
+  --max-workers 6 \
+  --hierarchy-budget-tokens 1800 \
+  --hierarchy-max-items 60
+```
+
+Status:
+
+- `artifacts/batches/babilong_state_hierarchy_qa11_14_512k_1m_s3_72/status.json`
+- 72 / 72 jobs completed
+- 0 subprocess failures
+- 0 record errors
+
+Analysis:
+
+- `artifacts/analysis/babilong_state_hierarchy_qa11_14_512k_1m_s3_72/report.md`
+
+Results:
+
+| Arm | Strict | Relaxed | Avg evidence | Avg duration |
+|---|---:|---:|---:|---:|
+| `babilong_state_packet` | 24/24 | 24/24 | 208 tok | 6.3s |
+| `grep_file` | 5/24 | 24/24 | tools | 13.0s |
+| `virtual_context` | 4/24 | 10/24 | 293 tok | 14.9s |
+
+Combined all-length analysis:
+
+- `artifacts/analysis/babilong_state_hierarchy_qa11_14_all_lengths_s3_144/report.md`
+- 48 tasks = qa11-qa14 x 3 samples x 4 lengths (`128k`, `256k`, `512k`, `1M`).
+
+| Arm | Strict | Relaxed | Avg evidence | Avg duration |
+|---|---:|---:|---:|---:|
+| `babilong_state_packet` | 48/48 | 48/48 | 208 tok | 6.2s |
+| `grep_file` | 12/48 | 47/48 | tools | 11.8s |
+| `virtual_context` | 7/48 | 18/48 | 279 tok | 11.7s |
+
+By task for `babilong_state_packet`:
+
+- qa11: 12/12
+- qa12: 12/12
+- qa13: 12/12
+- qa14: 12/12
+
+Shareable note:
+
+- `docs/work/babilong_state_hierarchy_share_2026-06-02.md`
+
+One-liner:
+
+> On BABILong qa11-qa14 across 128k–1M contexts, a deterministic state-table hierarchy got 48/48 strict with a ~208-token packet and no tools. Generic virtual context got 7/48 strict, while grep was mostly semantically right under relaxed scoring but only 12/48 strict and slower.
+
+Interpretation:
+
+- The state-table operator now holds across all available qa11-qa14 lengths/samples in this local S3 panel.
+- The result supports the task-specific-operator hypothesis: BABILong needs explicit state tracking, not generic evidence windows.
+- Grep remains semantically strong when relaxed, but the state packet is strict-clean, tool-free, and shorter/faster.
+- Scope remains qa11-qa14 only; qa15-qa20 need different operators or should be reported separately.
+
+Verification:
+
+- `uv run pytest -q` -> 68 passed
+
 ## Next command
 
-Either scale BABILong qa11-qa14 to 512k/1M, or start the OOLONG counter hierarchy for aggregate transcript questions.
+Either start OOLONG counter hierarchy, or write the final hierarchy execution summary and stop the loop.
