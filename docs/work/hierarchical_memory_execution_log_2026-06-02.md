@@ -866,6 +866,11 @@ Verification:
 
 - `uv run pytest -q` -> 68 passed
 
+Committed/pushed:
+
+- commit: `288d0dd` — `Record all-length BABILong hierarchy results`
+- URL: `https://github.com/ayushnangia/CompactionBench/commit/288d0dd`
+
 ## Next command
 
 Either start OOLONG counter hierarchy, or write the final hierarchy execution summary and stop the loop.
