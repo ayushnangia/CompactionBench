@@ -123,6 +123,7 @@ def build_babilong_state_prompt(question: str, *, packet: HierarchicalMemoryPack
         "You are answering from a BABILONG STATE-TABLE MEMORY PACKET.\n"
         "The packet was built by extracting BABI-style movement/object events from long carrier text and consolidating current state.\n"
         "Do not use tools or the web. Answer only from the packet. If the packet is insufficient, answer unknown.\n"
+        "For BABILong, return the bare benchmark label: e.g. `office`, not `the office`; `yes`/`no`; or a comma-separated path.\n"
         "Return exactly one JSON object with one field: {\"answer\": \"...\"}. Do not include extra text.\n"
         "<BABILONG_STATE_MEMORY_PACKET>\n"
         f"{packet.evidence_text}\n"

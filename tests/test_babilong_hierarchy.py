@@ -40,4 +40,5 @@ def test_babilong_state_prompt_hides_tools() -> None:
 
     assert "BABILONG STATE-TABLE MEMORY PACKET" in prompt
     assert "Do not use tools" in prompt
+    assert "bare benchmark label" in prompt
     assert '{"answer": "..."}' in prompt

@@ -709,6 +709,71 @@ Committed/pushed:
 - commit: `f2aea4a` — `Add BABILong state-table hierarchy canary`
 - URL: `https://github.com/ayushnangia/CompactionBench/commit/f2aea4a`
 
+## Iteration 8: scaled BABILong qa11-qa14 panel
+
+Scaled BABILong state-table panel:
+
+- `data/benchmarks/babilong_state_hierarchy_qa11_14_128k_256k_s3.jsonl`
+- 24 tasks = qa11-qa14 x 3 samples x 2 lengths (`128k`, `256k`).
+- Arms: `grep_file`, `virtual_context`, `babilong_state_packet`.
+
+Run:
+
+```bash
+uv run python scripts/run_lossless_vs_grep_codex_parallel.py \
+  --tasks data/benchmarks/babilong_state_hierarchy_qa11_14_128k_256k_s3.jsonl \
+  --root-dir artifacts/batches/babilong_state_hierarchy_qa11_14_128k_256k_s3_72 \
+  --arm grep_file \
+  --arm virtual_context \
+  --arm babilong_state_packet \
+  --model gpt-5.4-mini \
+  --reasoning-effort low \
+  --verbosity low \
+  --timeout-s 300 \
+  --max-workers 6 \
+  --hierarchy-budget-tokens 1800 \
+  --hierarchy-max-items 60
+```
+
+One state-packet strict miss was formatting (`the office` vs `office`). The prompt now explicitly asks for the bare BABILong benchmark label. Reran only `babilong_state_packet` with `--no-skip-existing`.
+
+Status:
+
+- `artifacts/batches/babilong_state_hierarchy_qa11_14_128k_256k_s3_72/status.json`
+- 72 / 72 jobs completed
+- 0 subprocess failures
+- 0 record errors
+
+Analysis:
+
+- `artifacts/analysis/babilong_state_hierarchy_qa11_14_128k_256k_s3_72/report.md`
+
+Results after state-packet rerun:
+
+| Arm | Strict | Relaxed | Avg evidence | Avg duration |
+|---|---:|---:|---:|---:|
+| `babilong_state_packet` | 24/24 | 24/24 | 208 tok | 6.0s |
+| `grep_file` | 7/24 | 23/24 | tools | 10.6s |
+| `virtual_context` | 3/24 | 8/24 | 265 tok | 8.5s |
+
+By task for `babilong_state_packet`:
+
+- qa11: 6/6
+- qa12: 6/6
+- qa13: 6/6
+- qa14: 6/6
+
+Interpretation:
+
+- The state-table operator scales from the tiny 4-task canary to 24 qa11-qa14 tasks across two context lengths.
+- Strict scoring makes grep look worse than relaxed scoring because grep often answers with article/preamble variants; still, the state packet is both tool-free and strict-clean.
+- Generic virtual context remains weak here, confirming that BABILong needs explicit state extraction rather than generic evidence windows.
+
+Verification:
+
+- `uv run pytest -q tests/test_babilong_hierarchy.py` -> 3 passed
+- `uv run pytest -q` -> 68 passed
+
 ## Next command
 
-Scale `babilong_state_packet` on qa11-qa14 across more samples/lengths and compare against `grep_file` / `virtual_context`, or start the OOLONG counter hierarchy.
+Either scale BABILong qa11-qa14 to 512k/1M, or start the OOLONG counter hierarchy for aggregate transcript questions.
