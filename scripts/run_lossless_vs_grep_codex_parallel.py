@@ -41,6 +41,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from compactionbench.chunking import estimate_tokens
+from compactionbench.babilong_hierarchy import build_babilong_state_packet, build_babilong_state_prompt
 from compactionbench.hierarchical_memory import HierarchicalMemoryConfig, build_flat_memory_packet, build_flat_memory_prompt, build_hierarchical_memory_packet, build_hierarchical_memory_prompt, build_oracle_memory_prompt
 from compactionbench.paged_context import benchmark_hint, build_paged_prompt, write_paged_memory
 from compactionbench.virtual_context import RlmContextConfig, VirtualContextConfig, build_rlm_context_packet, build_virtual_context_packet, build_virtual_context_prompt
@@ -66,6 +67,7 @@ Arm = Literal[
     "hierarchy_packet",
     "hierarchy_oracle",
     "flat_memory_packet",
+    "babilong_state_packet",
     "rlm_repl_depth0",
 ]
 
@@ -106,7 +108,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max-workers", type=int, default=8)
     p.add_argument(
         "--arm",
-        choices=["full_context", "grep_file", "paged_context", "virtual_context", "virtual_context_8k", "virtual_context_24k", "virtual_context_48k", "virtual_context_rlm", "raw_snippets_prompt", "raw_snippets_file", "structured_notes_prompt", "structured_notes_file", "cli_notes_same_session", "cli_notes_two_stage", "hierarchy_packet", "hierarchy_oracle", "flat_memory_packet", "rlm_repl_depth0"],
+        choices=["full_context", "grep_file", "paged_context", "virtual_context", "virtual_context_8k", "virtual_context_24k", "virtual_context_48k", "virtual_context_rlm", "raw_snippets_prompt", "raw_snippets_file", "structured_notes_prompt", "structured_notes_file", "cli_notes_same_session", "cli_notes_two_stage", "hierarchy_packet", "hierarchy_oracle", "flat_memory_packet", "babilong_state_packet", "rlm_repl_depth0"],
         action="append",
         default=None,
         help="Optional arm allowlist; default runs full_context and grep_file.",
@@ -357,6 +359,14 @@ def run_one(job: Job, task: TaskRow, *, run_task_id: str, log_path: Path) -> Run
             packet = build_flat_memory_packet(task.context, task.question, config=hierarchy_config)
             hierarchical_memory_metadata = packet.metadata()
             prompt = build_flat_memory_prompt(task.question, packet=packet)
+        elif job.arm == "babilong_state_packet":
+            hierarchy_config = HierarchicalMemoryConfig(
+                budget_tokens=job.hierarchy_budget_tokens,
+                max_items_per_tier=job.hierarchy_max_items,
+            )
+            packet = build_babilong_state_packet(task.context, task.question, config=hierarchy_config)
+            hierarchical_memory_metadata = packet.metadata()
+            prompt = build_babilong_state_prompt(task.question, packet=packet)
         elif job.arm == "hierarchy_oracle":
             oracle_evidence = str(task.metadata.get("oracle_evidence") or task.gold_answer)
             hierarchical_memory_metadata = {
@@ -559,8 +569,8 @@ def run_one(job: Job, task: TaskRow, *, run_task_id: str, log_path: Path) -> Run
             "virtual_page_tokens": job.virtual_page_tokens if is_virtual_context_arm(job.arm) else None,
             "virtual_overlap_tokens": job.virtual_overlap_tokens if is_virtual_context_arm(job.arm) else None,
             "virtual_budget_tokens": virtual_budget_for_arm(job.arm, default_budget=job.virtual_budget_tokens) if is_virtual_context_arm(job.arm) else None,
-            "hierarchy_budget_tokens": job.hierarchy_budget_tokens if job.arm in {"hierarchy_packet", "flat_memory_packet"} else None,
-            "hierarchy_max_items": job.hierarchy_max_items if job.arm in {"hierarchy_packet", "flat_memory_packet"} else None,
+            "hierarchy_budget_tokens": job.hierarchy_budget_tokens if job.arm in {"hierarchy_packet", "flat_memory_packet", "babilong_state_packet"} else None,
+            "hierarchy_max_items": job.hierarchy_max_items if job.arm in {"hierarchy_packet", "flat_memory_packet", "babilong_state_packet"} else None,
             "virtual_context": virtual_context_metadata,
             "cli_notes": cli_notes_metadata,
             "hierarchical_memory": hierarchical_memory_metadata,

@@ -630,6 +630,80 @@ Relevant code/docs were committed and pushed:
 
 Generated task files and run artifacts remain local/ignored; commands in this log regenerate them.
 
+## Iteration 7 reflection: moved to BABILong state hierarchy
+
+Reflection:
+
+- Accomplished: the synthetic hierarchy pipeline is implemented, tested, pushed, and now has both easy/stale panels and a budget-pressure panel that separates flat packet vs hierarchy.
+- Working well: deterministic state/counter memory gives interpretable wins under budget pressure; artifacts are reproducible from commands; query-type reporting catches whether wins are real or just formatting.
+- Not working/blocking: synthetic-only results are not enough. The next validation needs real benchmark structure, and generic virtual-context evidence is weak on BABILong strict scoring because carrier prose and answer formatting interfere.
+- Approach adjustment: move from generic hierarchy to task-specific memory operators: BABILong state tables first, then OOLONG counters.
+- Next priority: canary a BABILong state-table packet on qa11-qa14 before scaling.
+
+Implemented first BABILong state-table arm:
+
+- `compactionbench/babilong_hierarchy.py`
+- runner arm: `babilong_state_packet`
+- tests: `tests/test_babilong_hierarchy.py`
+
+Memory design:
+
+- L1: selected extracted BABI event trace
+- L2: current person/object state table plus query-specific derived state
+- L3: raw archive extraction summary
+
+Important extractor detail:
+
+- It keeps the largest dense BABI-event block and drops isolated carrier-prose sentences that accidentally match BABI patterns.
+- It handles pair movement and simple `they` / `he` / `she` coreference used by qa11-qa14.
+
+BABILong qa11-qa14 canary panel:
+
+- `data/benchmarks/babilong_state_hierarchy_canary_qa11_14_128k.jsonl`
+- 4 tasks: qa11, qa12, qa13, qa14 at 128k.
+
+Run:
+
+```bash
+uv run python scripts/run_lossless_vs_grep_codex_parallel.py \
+  --tasks data/benchmarks/babilong_state_hierarchy_canary_qa11_14_128k.jsonl \
+  --root-dir artifacts/batches/babilong_state_hierarchy_canary_qa11_14_12 \
+  --arm grep_file \
+  --arm virtual_context \
+  --arm babilong_state_packet \
+  --model gpt-5.4-mini \
+  --reasoning-effort low \
+  --verbosity low \
+  --timeout-s 240 \
+  --max-workers 4 \
+  --hierarchy-budget-tokens 1600 \
+  --hierarchy-max-items 40
+```
+
+After improving carrier-noise filtering, reran the `babilong_state_packet` arm with `--no-skip-existing`.
+
+Analysis:
+
+- `artifacts/analysis/babilong_state_hierarchy_canary_qa11_14_12/report.md`
+
+Results:
+
+| Arm | Strict | Relaxed | Avg evidence | Avg duration |
+|---|---:|---:|---:|---:|
+| `babilong_state_packet` | 4/4 | 4/4 | 192 tok | 7.4s |
+| `grep_file` | 2/4 | 4/4 | tools | 8.7s |
+| `virtual_context` | 0/4 | 2/4 | 264 tok | 11.5s |
+
+Interpretation:
+
+- The BABILong state-table arm is now a working canary and fixes qa11/qa12 failures caused by pronoun/coreference plus carrier-prose distractors.
+- This is very small and only covers qa11-qa14 movement/coreference/time-reasoning tasks, not qa15-qa20.
+- Next step is scaling qa11-qa14 across samples/lengths, then deciding whether to extend state operators or leave qa15-qa20 out of scope.
+
+Verification:
+
+- `uv run pytest -q` -> 68 passed
+
 ## Next command
 
-If continuing, run the full 10-stream mixed panel or start converting this synthetic canary into a real BABILong/OOLONG state-table hierarchy experiment.
+Scale `babilong_state_packet` on qa11-qa14 across more samples/lengths and compare against `grep_file` / `virtual_context`, or start the OOLONG counter hierarchy.
