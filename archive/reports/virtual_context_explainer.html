@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Virtual Context Memory — Plain English Explainer</title>
+<style>
+:root{--bg:#0b1020;--panel:#111827;--panel2:#172033;--text:#eef4ff;--muted:#a9b6ca;--line:#2a3852;--blue:#60a5fa;--green:#34d399;--yellow:#fbbf24;--red:#fb7185;--purple:#c084fc}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 8% 0%,rgba(96,165,250,.23),transparent 34rem),radial-gradient(circle at 92% 8%,rgba(192,132,252,.16),transparent 30rem),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.55}.wrap{max-width:1180px;margin:0 auto;padding:42px 22px 80px}header,section{border:1px solid var(--line);background:rgba(17,24,39,.94);border-radius:26px;box-shadow:0 18px 55px rgba(0,0,0,.35);padding:30px;margin-bottom:22px}h1{font-size:clamp(36px,6vw,72px);line-height:1;letter-spacing:-.055em;margin:0 0 14px}h2{font-size:clamp(24px,3vw,38px);line-height:1.1;letter-spacing:-.035em;margin:0 0 16px}h3{font-size:20px;margin:0 0 8px}p{margin:0 0 12px}.big{font-size:20px;color:#dbeafe}.muted{color:var(--muted)}.pillrow{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}.pill{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(11,16,32,.55);color:#dbeafe;font-size:14px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.grid.two{grid-template-columns:repeat(2,1fr)}.card{border:1px solid var(--line);border-radius:20px;background:rgba(23,32,51,.85);padding:20px}.green{color:var(--green);font-weight:850}.blue{color:var(--blue);font-weight:850}.yellow{color:var(--yellow);font-weight:850}.red{color:var(--red);font-weight:850}.purple{color:var(--purple);font-weight:850}.callout{border-radius:20px;padding:22px;border:1px solid rgba(52,211,153,.45);background:rgba(52,211,153,.10)}.warn{border-color:rgba(251,191,36,.48);background:rgba(251,191,36,.10)}table{width:100%;border-collapse:collapse;margin-top:14px;border-radius:16px;overflow:hidden;font-size:15px}th,td{border:1px solid var(--line);padding:12px 14px;text-align:left;vertical-align:top}th{background:#0b1020;color:#e5efff}td{background:rgba(11,16,32,.36)}code,pre{background:#0b1020;border:1px solid var(--line);border-radius:12px}code{padding:2px 5px}pre{padding:16px;white-space:pre-wrap;word-break:break-word;color:#dbeafe}.diagram{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:12px;align-items:center}.box{border:1px solid var(--line);border-radius:18px;background:rgba(23,32,51,.92);padding:18px;min-height:132px}.arrow{font-size:34px;color:var(--blue);font-weight:900}.stack{display:grid;gap:10px}.mini{border:1px solid var(--line);border-radius:14px;background:#0b1020;padding:12px}.osgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.quote{border-left:4px solid var(--blue);padding-left:16px;color:#dbeafe;font-size:18px;margin:12px 0}@media(max-width:900px){.grid,.grid.two,.diagram,.osgrid{grid-template-columns:1fr}.arrow{transform:rotate(90deg);text-align:center}header,section{padding:22px}}
+</style>
+</head>
+<body><main class="wrap">
+<header>
+<h1>Virtual Context Memory</h1>
+<p class="big">An OS-like memory system for long-context agents: the model does not search or page manually. The system loads the right evidence before the model answers.</p>
+<div class="pillrow"><span class="pill">hidden page table</span><span class="pill">system-managed retrieval</span><span class="pill">resident evidence packet</span><span class="pill">0 model tools</span></div>
+</header>
+
+<section>
+<h2>The simple idea</h2>
+<div class="callout"><p><strong>Virtual context means:</strong> keep the full source outside the model, split it into pages, let the system choose the useful pages, and give the model only the current evidence packet.</p><p>The model should not think: “Which page should I search?” The model should only think: “Given this evidence, what is the answer?”</p></div>
+</section>
+
+<section>
+<h2>Diagram: what happens</h2>
+<div class="diagram">
+<div class="box"><h3>1. Original source</h3><p>Huge transcript / document / benchmark context.</p><pre>Mary journeyed to the bathroom.
+...
+100k+ tokens of text</pre></div>
+<div class="arrow">→</div>
+<div class="box"><h3>2. Memory kernel</h3><p>The system splits source into pages and builds a hidden index.</p><pre>page_0001.txt
+page_0002.txt
+page table
+retrieval rules</pre></div>
+<div class="arrow">→</div>
+<div class="box"><h3>3. Evidence packet</h3><p>The model receives only the selected resident working set.</p><pre>Relevant evidence:
+Mary journeyed to the bathroom.</pre></div>
+</div>
+<div class="diagram" style="margin-top:12px;grid-template-columns:1fr auto 1fr;">
+<div class="box"><h3>4. Model answers</h3><p>No grep. No pager tool. No web. Just answer from evidence.</p><pre>{"answer":"bathroom"}</pre></div>
+<div class="arrow">→</div>
+<div class="box"><h3>5. Audit trail</h3><p>We record which pages/evidence the system loaded.</p><pre>selected_pages: [77, 78]
+evidence_tokens: 183
+strategy: babi_event_trace</pre></div>
+</div>
+</section>
+
+<section>
+<h2>Why this is more OS-like</h2>
+<table><thead><tr><th>Operating system</th><th>Virtual context</th></tr></thead><tbody>
+<tr><td>Disk stores all data.</td><td>Original long source is stored outside the model.</td></tr>
+<tr><td>RAM holds only the current working set.</td><td>Prompt holds only the evidence packet.</td></tr>
+<tr><td>Page table maps page IDs to locations.</td><td>Hidden index maps source pages to files/line ranges/previews.</td></tr>
+<tr><td>Kernel loads pages.</td><td>Memory kernel retrieves evidence before the model call.</td></tr>
+<tr><td>Program does not manually load pages.</td><td>Model does not call <code>pager.py</code> or grep.</td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>Compared to the other arms</h2>
+<table><thead><tr><th>Arm</th><th>Who manages memory?</th><th>What model sees</th><th>Problem</th></tr></thead><tbody>
+<tr><td><code>full_context</code></td><td>Nobody</td><td>Whole source pasted into prompt</td><td>Large/noisy context can distract the model.</td></tr>
+<tr><td><code>grep_file</code></td><td>Model + shell tools</td><td>A giant file and permission to search</td><td>Model must choose searches and interpret results.</td></tr>
+<tr><td><code>paged_context</code></td><td>Model</td><td>Page table + <code>pager.py</code></td><td>Too much memory-management burden on the model.</td></tr>
+<tr><td><code>virtual_context</code></td><td><strong>System</strong></td><td><strong>Evidence packet only</strong></td><td>Best current direction; still needs page-fault retries and structured aggregation.</td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>Concrete example</h2>
+<div class="grid two">
+<div class="card"><h3>Bad retrieval trap</h3><p>The long source may contain unrelated carrier prose:</p><pre>Mary Linden went to Didlum's shop.</pre><p>If the model greps “Mary”, it may answer about the wrong Mary.</p></div>
+<div class="card"><h3>Virtual context fix</h3><p>The memory kernel extracts concise benchmark facts:</p><pre>Mary journeyed to the bathroom.</pre><p>The model receives the relevant event trace, not all noisy Mary mentions.</p></div>
+</div>
+</section>
+
+<section>
+<h2>What the model actually receives</h2>
+<pre>You are answering from TRANSPARENT VIRTUAL CONTEXT.
+A system memory kernel has already retrieved the relevant source pages and evidence.
+Do not search files or use tools.
+
+&lt;VIRTUAL_CONTEXT_EVIDENCE&gt;
+Evidence 1: BABILong concise event trace
+[001] John travelled to the hallway.
+[002] Mary journeyed to the bathroom.
+&lt;/VIRTUAL_CONTEXT_EVIDENCE&gt;
+
+Question: Where is Mary?</pre>
+<p>The model never sees the full page system. It only sees the resident evidence.</p>
+</section>
+
+<section>
+<h2>What happened in the experiment</h2>
+<table><thead><tr><th>Arm</th><th>Strict</th><th>Relaxed</th><th>Tools</th></tr></thead><tbody>
+<tr><td>grep_file</td><td>52/250 = 20.8%</td><td>93/250 = 37.2%</td><td>4.32/run</td></tr>
+<tr><td>paged_context</td><td>37/250 = 14.8%</td><td>87/250 = 34.8%</td><td>5.30/run</td></tr>
+<tr><td>virtual_context_8k</td><td>59/250 = 23.6%</td><td><strong>99/250 = 39.6%</strong></td><td>0/run</td></tr>
+<tr><td>virtual_context_24k</td><td><strong>62/250 = 24.8%</strong></td><td>98/250 = 39.2%</td><td>0/run</td></tr>
+</tbody></table>
+<p class="quote">Interpretation: system-managed memory beat model-managed paging and grep overall on this fixed BABILong/OOLONG run.</p>
+</section>
+
+<section>
+<h2>What is still missing</h2>
+<div class="grid two">
+<div class="card"><h3>Page-fault retry</h3><p>Future version should verify if the answer is supported. If not, the system loads more pages and asks again.</p></div>
+<div class="card"><h3>Aggregation operators</h3><p>OOLONG needs roll/spell tables, counting, percentages, first/last extraction. Retrieval alone is not enough.</p></div>
+</div>
+</section>
+
+<section>
+<h2>One-line summary</h2>
+<div class="callout"><p><strong>Virtual context is like giving the model RAM, not the disk:</strong> the full source stays outside, the system loads the current working set, and the model answers from that evidence without doing memory management itself.</p></div>
+</section>
+
+<section>
+<h2>Files</h2>
+<table><tbody><tr><th>Implementation</th><td><code>compactionbench/virtual_context.py</code></td></tr><tr><th>Detailed docs</th><td><code>docs/virtual_context_memory.md</code></td></tr><tr><th>Experiment findings</th><td><code>docs/os_levels_babilong_oolong_findings.html</code></td></tr></tbody></table>
+</section>
+</main></body></html>

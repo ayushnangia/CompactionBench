@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from compactionbench.score import score_one
+from compactionbench.core.score import score_one
 
 
 def test_csv_set_ci_matches_comma_separated_sets_order_insensitively() -> None:

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 
-from compactionbench.judge import JudgeDecision, JudgeResult, _parse_judge_json, _should_judge, judge_runs
-from compactionbench.schema import AgentAnswer, RunRecord
+from compactionbench.core.judge import JudgeDecision, JudgeResult, _parse_judge_json, _should_judge, judge_runs
+from compactionbench.core.schema import AgentAnswer, RunRecord
 
 
 def test_parse_judge_json_wrapped_text() -> None:
@@ -88,9 +88,9 @@ def test_judge_runs_parallel_with_stubbed_judge(tmp_path, monkeypatch) -> None:
     (runs / 'good.json').write_text(good.model_dump_json(indent=2))
     (runs / 'already.json').write_text(already.model_dump_json(indent=2))
 
-    monkeypatch.setattr('compactionbench.judge._make_client', lambda: object())
+    monkeypatch.setattr('compactionbench.core.judge._make_client', lambda: object())
     monkeypatch.setattr(
-        'compactionbench.judge.judge_one',
+        'compactionbench.core.judge.judge_one',
         lambda **kwargs: JudgeResult(
             decision=JudgeDecision(equivalent=True, reason='normalized yes/no'),
             raw_text='{"equivalent": true, "reason": "normalized yes/no"}',

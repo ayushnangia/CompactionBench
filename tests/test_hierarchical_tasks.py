@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from compactionbench.hierarchical_tasks import generate_hierarchical_memory_tasks
+from compactionbench.taskgen.hierarchical import generate_hierarchical_memory_tasks
 
 
 def test_generate_hierarchical_memory_tasks_reuses_context_per_stream() -> None:

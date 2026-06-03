@@ -1,0 +1,2 @@
+{"id":"q-static","domain":"enterprise","environment":"workarena","question_type":"static-environment","question":"What is the configured laptop surcharge?","answer":"300","eval_function":"norm_phrase_set_match|lower=true"}
+{"id":"q-dynamic","domain":"enterprise","environment":"workarena","question_type":"dynamic-environment","question":"Which incident labels are visible?","answer":"Incident Mobile, Incident Portal","eval_function":"norm_phrase_set_match|lower=true|separators=,;"}

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 
-from compactionbench.schema import AgentAnswer, RunRecord
-from compactionbench.score import score_runs
+from compactionbench.core.schema import AgentAnswer, RunRecord
+from compactionbench.core.score import score_runs
 
 
 def test_score_runs_writes_summary(tmp_path) -> None:

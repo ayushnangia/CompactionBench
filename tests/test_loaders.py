@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from compactionbench.loaders import (
+from compactionbench.datasets.lme_loader import prepare_lme_tasks
+from compactionbench.datasets.loaders import (
     _clean_babilong_carrier_text,
     extend_babilong_rows_with_long_carriers,
     prepare_babilong_tasks,
@@ -14,13 +15,16 @@ from compactionbench.loaders import (
     prepare_oolong_synth_tasks,
     prepare_ruler_tasks,
 )
-from compactionbench.schema import TaskRow
+from compactionbench.core.schema import TaskRow
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 RULER_FIXTURE = FIXTURES / "ruler_sample_3.jsonl"
 BABILONG_FIXTURE = FIXTURES / "babilong_sample_2.jsonl"
 OOLONG_SYNTH_FIXTURE = FIXTURES / "oolong_synth_sample_2.jsonl"
 OOLONG_REAL_FIXTURE = FIXTURES / "oolong_real_sample_2.jsonl"
+LME_HAYSTACK_FIXTURE = FIXTURES / "lme_haystack.json"
+LME_TRAJECTORIES_FIXTURE = FIXTURES / "lme_trajectories.jsonl"
+LME_QUESTIONS_FIXTURE = FIXTURES / "lme_questions.jsonl"
 
 
 def test_prepare_ruler_tasks_emits_rows() -> None:
@@ -75,6 +79,23 @@ def test_clean_babilong_carrier_text_removes_babi_like_lines() -> None:
     assert "Mary went to the bathroom." not in got
     assert "Fred picked up the football there." not in got
     assert "Another safe paragraph." in got
+
+
+def test_prepare_lme_tasks_emits_one_per_question_type() -> None:
+    rows = prepare_lme_tasks(
+        LME_HAYSTACK_FIXTURE,
+        LME_TRAJECTORIES_FIXTURE,
+        LME_QUESTIONS_FIXTURE,
+        count=10,
+        target_tokens=100,
+        count_per_type=1,
+    )
+    assert len(rows) == 2
+    assert rows[0].source_benchmark == "lme"
+    assert {row.metadata["question_type"] for row in rows} == {"static-environment", "dynamic-environment"}
+    assert rows[0].context
+    assert rows[0].scorer == "exact_ci"
+    assert rows[1].scorer == "csv_set_ci"
 
 
 def test_prepare_oolong_synth_tasks_emits_rows() -> None:

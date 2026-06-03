@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Research Questions — Context vs Search</title>
+<style>
+:root{--bg:#0b1020;--panel:#111827;--panel2:#172033;--text:#eef4ff;--muted:#a9b6ca;--line:#2a3852;--blue:#60a5fa;--green:#34d399;--yellow:#fbbf24;--red:#fb7185;--purple:#c084fc;--shadow:rgba(0,0,0,.35)}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 10% 0%,rgba(96,165,250,.22),transparent 35rem),radial-gradient(circle at 90% 10%,rgba(192,132,252,.16),transparent 30rem),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.55}.wrap{max-width:1180px;margin:0 auto;padding:42px 22px 80px}header,section{border:1px solid var(--line);background:rgba(17,24,39,.93);border-radius:26px;box-shadow:0 18px 55px var(--shadow)}header{padding:38px;margin-bottom:24px;background:linear-gradient(135deg,rgba(17,24,39,.96),rgba(23,32,51,.88))}section{padding:28px;margin-top:20px}h1{font-size:clamp(36px,6vw,72px);line-height:1;letter-spacing:-.055em;margin:0 0 14px}h2{font-size:clamp(24px,3vw,38px);line-height:1.1;letter-spacing:-.035em;margin:0 0 16px}h3{font-size:20px;margin:0 0 8px}p{margin:0 0 12px}.big{font-size:20px;color:#dbeafe}.muted{color:var(--muted)}.tiny{font-size:13px;color:var(--muted)}strong{color:white}.green{color:var(--green);font-weight:850}.blue{color:var(--blue);font-weight:850}.yellow{color:var(--yellow);font-weight:850}.red{color:var(--red);font-weight:850}.purple{color:var(--purple);font-weight:850}.pillrow{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}.pill{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(11,16,32,.55);color:#dbeafe;font-size:14px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.grid.two{grid-template-columns:repeat(2,1fr)}.grid.four{grid-template-columns:repeat(4,1fr)}.card{border:1px solid var(--line);border-radius:20px;background:rgba(23,32,51,.85);padding:20px}.metric{font-size:40px;line-height:1;font-weight:950;letter-spacing:-.05em;margin:8px 0}.callout{border-radius:20px;padding:22px;border:1px solid rgba(52,211,153,.45);background:rgba(52,211,153,.10)}.warn{border-color:rgba(251,191,36,.48);background:rgba(251,191,36,.10)}.bad{border-color:rgba(251,113,133,.48);background:rgba(251,113,133,.10)}table{width:100%;border-collapse:collapse;margin-top:14px;border-radius:16px;overflow:hidden;font-size:15px}th,td{border:1px solid var(--line);padding:12px 14px;text-align:left;vertical-align:top}th{background:#0b1020;color:#e5efff}td{background:rgba(11,16,32,.36)}pre{white-space:pre-wrap;word-break:break-word;background:#0b1020;border:1px solid var(--line);border-radius:16px;padding:16px;color:#dbeafe;margin:12px 0 0;font-size:14px}.quote{border-left:4px solid var(--blue);padding-left:16px;color:#dbeafe;font-size:18px;margin:12px 0}.status{display:inline-block;padding:4px 9px;border-radius:999px;border:1px solid var(--line);font-size:12px;font-weight:850}.done{background:rgba(52,211,153,.14);color:var(--green)}.partial{background:rgba(251,191,36,.14);color:var(--yellow)}.needs{background:rgba(251,113,133,.14);color:var(--red)}@media(max-width:900px){.grid,.grid.two,.grid.four{grid-template-columns:1fr}header,section{padding:22px}}
+</style>
+</head>
+<body>
+<main class="wrap">
+<header>
+<h1>Research questions answered</h1>
+<p class="big">This is the clean map for the context-vs-search work: what we know, what is still open, and examples people can understand quickly.</p>
+<div class="pillrow"><span class="pill">500-run clean control</span><span class="pill">250-run SWE/LME follow-up</span><span class="pill">100-run compacted agent baseline</span><span class="pill">examples included</span></div>
+</header>
+
+<section>
+<h2>TL;DR</h2>
+<div class="grid two">
+<div class="callout">
+<h3>Main answer</h3>
+<p><strong>Do not say “grep always beats full context.”</strong></p>
+<p>Strict exact scoring made file search look better in the clean control, but normalized/semantic scoring shows a more nuanced picture.</p>
+<p>The real takeaway is: <span class="green">keep original sources searchable</span> and also give the model enough context to reason.</p>
+</div>
+<div class="callout warn">
+<h3>Most important caveat</h3>
+<p>There are three different settings:</p>
+<p>1. non-compacted full prompt</p>
+<p>2. searchable source file</p>
+<p>3. long agent chat with compaction</p>
+<p>Do not mix these without labeling them.</p>
+</div>
+</div>
+</section>
+
+<section>
+<h2>RQ map</h2>
+<table>
+<thead><tr><th>RQ</th><th>Status</th><th>Short answer</th></tr></thead>
+<tbody>
+<tr><td>RQ1: Non-compacted full context vs file search</td><td><span class="status done">answered with caveat</span></td><td>Strict score favors search; normalized score does not.</td></tr>
+<tr><td>RQ2: Compacted agent memory vs search</td><td><span class="status partial">partially answered</span></td><td>Compaction hurts. Need a larger paired compacted-vs-search run for final numbers.</td></tr>
+<tr><td>RQ3: Where does search help?</td><td><span class="status done">answered</span></td><td>Literal lookup, labels, fields, option letters, and procedures.</td></tr>
+<tr><td>RQ4: Where does full context help?</td><td><span class="status done">answered</span></td><td>Aggregation, counting, broad reading, and semantic coding replies.</td></tr>
+<tr><td>RQ5: SWE-chat coding sessions</td><td><span class="status needs">needs judge</span></td><td>Exact scoring is unusable. Rough semantic scoring favors full context.</td></tr>
+<tr><td>RQ6: LongMemEval web-agent memory</td><td><span class="status partial">tentative</span></td><td>Search modestly helps on rendered LME, especially procedures.</td></tr>
+<tr><td>RQ7: System design recommendation</td><td><span class="status done">answered</span></td><td>Use searchable source memory + concise context, not one or the other.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section>
+<h2>RQ1 — Does file search beat true non-compacted full context?</h2>
+<p><strong>Answer:</strong> Mixed. Strict exact scoring says yes; normalized scoring says not necessarily.</p>
+<div class="grid four">
+<div class="card"><h3>Clean runs</h3><div class="metric">500</div><p class="muted">250 tasks × 2 arms</p></div>
+<div class="card"><h3>Compactions</h3><div class="metric green">0</div><p class="muted">This was the lossless-control setting</p></div>
+<div class="card"><h3>Strict full context</h3><div class="metric blue">16%</div><p class="muted">40 / 250</p></div>
+<div class="card"><h3>Strict search</h3><div class="metric green">20%</div><p class="muted">50 / 250</p></div>
+</div>
+<table>
+<thead><tr><th>Scoring view</th><th>Full context</th><th>File search</th><th>Read</th></tr></thead>
+<tbody>
+<tr><td>Strict exact score</td><td>40 / 250</td><td>50 / 250</td><td>Search looks better.</td></tr>
+<tr><td>Rough normalized score on BABILong/OOLONG</td><td>~97 / 250</td><td>~83 / 250</td><td>Full context no longer loses.</td></tr>
+</tbody>
+</table>
+<div class="quote">Example: gold `garden`; full context said `the garden`; file search said `garden`. Strict score calls full context wrong, but humans would not.</div>
+</section>
+
+<section>
+<h2>RQ2 — Does search help when agent memory gets compacted?</h2>
+<p><strong>Answer:</strong> Yes qualitatively, but needs a larger paired compacted-vs-search run.</p>
+<table>
+<thead><tr><th>Run</th><th>Result</th><th>Why it matters</th></tr></thead>
+<tbody>
+<tr><td>100-task agent-memory baseline</td><td>68 / 100 runs compacted; 240 total compaction events; 21% accuracy</td><td>Shows the long-running agent setting is not the same as true full context.</td></tr>
+<tr><td>File search mechanism</td><td>Original source remains searchable</td><td>Can recover details that compressed chat memory may lose.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section>
+<h2>RQ3 — Where does file search help most?</h2>
+<p><strong>Answer:</strong> exact lookup and procedure retrieval.</p>
+<table>
+<thead><tr><th>Example</th><th>Gold</th><th>Full context</th><th>File search</th><th>Read</th></tr></thead>
+<tbody>
+<tr><td>BABILong: “What is the bedroom north of?”</td><td>garden</td><td>the garden</td><td>garden</td><td>Search got the exact string; full context was semantically fine.</td></tr>
+<tr><td>LME procedure: field/options question</td><td>G</td><td>C</td><td>G</td><td>Search found the relevant procedure evidence.</td></tr>
+<tr><td>LME dynamic: Loaner Laptop order status total</td><td>C</td><td>blank / failed</td><td>C</td><td>Search recovered the option.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section>
+<h2>RQ4 — Where does full context help more?</h2>
+<p><strong>Answer:</strong> aggregation and broad reading.</p>
+<table>
+<thead><tr><th>Example</th><th>Gold</th><th>Full context</th><th>File search</th><th>Read</th></tr></thead>
+<tbody>
+<tr><td>OOLONG: total Nat20s across episodes</td><td>7</td><td>7</td><td>6</td><td>Search undercounted; full context integrated better.</td></tr>
+<tr><td>OOLONG: rolls with value 4 percentage</td><td>1</td><td>1%</td><td>0</td><td>Full context computed closer/correct.</td></tr>
+<tr><td>LME static: extra incident-page button</td><td>Resolve</td><td>Resolve</td><td>Create Change Request</td><td>Search picked a plausible but wrong local match.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section>
+<h2>RQ5 — Does this hold for real coding-agent conversations?</h2>
+<p><strong>Answer:</strong> not with exact scoring. Needs judge scoring.</p>
+<table>
+<thead><tr><th>SWE-chat view</th><th>Full context</th><th>File search</th></tr></thead>
+<tbody>
+<tr><td>Strict substring correct</td><td>0 / 50</td><td>0 / 50</td></tr>
+<tr><td>Rough semantic average</td><td>~0.196</td><td>~0.139</td></tr>
+<tr><td>Rough semantic ≥ 0.2</td><td>19</td><td>12</td></tr>
+</tbody>
+</table>
+<p class="quote">For SWE-chat, the gold is a long assistant reply. Exact matching is the wrong judge. The early signal is that full context may be better for coding conversations because intent matters more than finding one line.</p>
+</section>
+
+<section>
+<h2>RQ6 — LongMemEval rendered web-agent memory</h2>
+<p><strong>Answer:</strong> search modestly helps, especially procedures. But LME is rendered/clipped context here, not raw lossless trajectory JSON.</p>
+<table>
+<thead><tr><th>LongMemEval rendered</th><th>Full context</th><th>File search</th></tr></thead>
+<tbody>
+<tr><td>Strict current scorer</td><td>8 / 75</td><td>12 / 75</td></tr>
+<tr><td>Rough corrected scoring</td><td>~7 / 75</td><td>~12 / 75</td></tr>
+</tbody>
+</table>
+<p class="quote">Label this honestly: LME here uses rendered/clipped browser trajectories, not raw lossless JSON trajectories.</p>
+</section>
+
+<section>
+<h2>RQ7 — What should we build next?</h2>
+<p><strong>Answer:</strong> an infinite-context-like pager: keep original sources on disk, page in evidence as needed, and never treat lossy compaction as the source of truth.</p>
+<div class="grid two">
+<div class="card"><h3>Bad abstraction</h3><p>“The agent remembers everything in the chat.” In long runs, old details get compacted or distorted.</p></div>
+<div class="card"><h3>Better abstraction</h3><p>“The agent has a searchable memory filesystem.” It can load original pages when the current working context is not enough.</p></div>
+</div>
+</section>
+
+<section>
+<h2>Artifacts</h2>
+<table>
+<thead><tr><th>Artifact</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>RQ markdown</td><td><code>docs/research_questions_answered.md</code></td></tr>
+<tr><td>Clean 500-run report</td><td><code>artifacts/batches/real_lossless_vs_grep_500/20260515-173440/analysis/report.md</code></td></tr>
+<tr><td>SWE-chat + LME 250-run report</td><td><code>artifacts/batches/swe_lme_real_vs_grep_250/20260518-173038/analysis/report.md</code></td></tr>
+<tr><td>Agent-memory baseline</td><td><code>artifacts/batches/balanced_context_100/20260514-184008/analysis/report.md</code></td></tr>
+</tbody>
+</table>
+</section>
+
+</main>
+</body>
+</html>

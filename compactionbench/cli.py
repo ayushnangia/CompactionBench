@@ -7,7 +7,8 @@ from pathlib import Path
 
 import typer
 
-from .loaders import (
+from .datasets.lme_loader import prepare_lme_tasks
+from .datasets.loaders import (
     BABILONG_DATASET_DEFAULT,
     OOLONG_REAL_CONFIG,
     OOLONG_REAL_DATASET,
@@ -22,11 +23,11 @@ from .loaders import (
     prepare_ruler_tasks,
     write_prepared_tasks,
 )
-from .tasks import generate_all_synthetic_tasks
-from .compression import compress_task_row, normalize_policy_name
-from .judge import judge_runs
-from .run import load_tasks, run_claude_code_tasks, run_codex_tasks
-from .score import format_report, score_runs
+from .taskgen.synthetic import generate_all_synthetic_tasks
+from .memory.compression import compress_task_row, normalize_policy_name
+from .core.judge import judge_runs
+from .runners.run import load_tasks, run_claude_code_tasks, run_codex_tasks
+from .core.score import format_report, score_runs
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -97,6 +98,32 @@ def prepare_babilong_hf(
     )
     write_prepared_tasks(rows, out)
     typer.echo(f"Wrote {len(rows)} validated BABILong HF rows to {out}")
+
+
+@prepare_app.command("lme")
+def prepare_lme(
+    haystack: Path = typer.Option(..., "--haystack", exists=True, readable=True, help="LongMemEval haystack JSON (e.g. haystacks/lme_v2_medium.json)."),
+    trajectories: Path = typer.Option(..., "--trajectories", exists=True, readable=True, help="LongMemEval trajectories JSONL."),
+    questions: Path = typer.Option(..., "--questions", exists=True, readable=True, help="LongMemEval questions JSONL."),
+    out: Path = typer.Option(Path("data/benchmarks/lme_tasks.jsonl"), help="Output JSONL for validated direct task rows."),
+    count: int = typer.Option(10, help="Maximum number of rows to emit."),
+    target_tokens: int = typer.Option(160_000, "--target-tokens", help="Minimum approximate context tokens after optional padding."),
+    question_type: list[str] = typer.Option(None, "--question-type", help="Optional LongMemEval question_type allowlist; repeat for multiple."),
+    count_per_type: int | None = typer.Option(None, "--count-per-type", help="Optional cap per question type."),
+    max_trajectories: int = typer.Option(120, "--max-trajectories", help="Maximum trajectories rendered from each haystack."),
+) -> None:
+    rows = prepare_lme_tasks(
+        haystack,
+        trajectories,
+        questions,
+        count=count,
+        target_tokens=target_tokens,
+        question_types=set(question_type) if question_type else None,
+        count_per_type=count_per_type,
+        max_trajectories=max_trajectories,
+    )
+    write_prepared_tasks(rows, out)
+    typer.echo(f"Wrote {len(rows)} validated LongMemEval rows to {out}")
 
 
 @prepare_app.command("oolong-synth")

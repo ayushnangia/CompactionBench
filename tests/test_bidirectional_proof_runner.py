@@ -4,11 +4,11 @@ import importlib.util
 import sys
 from pathlib import Path
 
-from compactionbench.schema import TaskRow
+from compactionbench.core.schema import TaskRow
 
 
 def load_runner_module():
-    path = Path("scripts/run_lossless_vs_grep_codex_parallel.py")
+    path = Path("scripts/run/run_lossless_vs_grep_codex_parallel.py")
     spec = importlib.util.spec_from_file_location("run_lossless_vs_grep_codex_parallel", path)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)

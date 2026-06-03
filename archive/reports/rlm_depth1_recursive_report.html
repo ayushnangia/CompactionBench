@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Full recursive RLM depth-1 report</title>
+<style>
+:root{--bg:#08111f;--panel:#111c2e;--panel2:#17263d;--text:#eef6ff;--muted:#aebbd0;--line:#2b3d5a;--blue:#60a5fa;--green:#34d399;--yellow:#fbbf24;--red:#fb7185;--purple:#c084fc}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 12% 0%,rgba(192,132,252,.20),transparent 34rem),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.55}.wrap{max-width:1180px;margin:0 auto;padding:42px 22px 82px}header,section{border:1px solid var(--line);background:rgba(17,28,46,.94);border-radius:24px;padding:28px;margin:0 0 20px;box-shadow:0 20px 60px rgba(0,0,0,.32)}h1{font-size:clamp(34px,6vw,66px);line-height:1;letter-spacing:-.055em;margin:0 0 14px}h2{font-size:clamp(24px,3vw,38px);line-height:1.1;letter-spacing:-.035em;margin:0 0 14px}h3{margin:0 0 8px}p{margin:0 0 12px}.big{font-size:20px;color:#dbeafe}.muted{color:var(--muted)}.pillrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.pill{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:#0b1020;color:#dbeafe;font-size:14px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.grid.two{grid-template-columns:repeat(2,1fr)}.card{border:1px solid var(--line);border-radius:18px;background:rgba(23,38,61,.86);padding:18px}.metric{font-size:38px;font-weight:950;letter-spacing:-.05em;line-height:1;margin:8px 0}table{width:100%;border-collapse:collapse;margin-top:12px;border-radius:14px;overflow:hidden}th,td{border:1px solid var(--line);padding:11px 13px;text-align:left;vertical-align:top}th{background:#0b1020}td{background:rgba(11,16,32,.38)}code{background:#0b1020;border:1px solid var(--line);border-radius:8px;padding:2px 5px}.green{color:var(--green);font-weight:850}.blue{color:var(--blue);font-weight:850}.yellow{color:var(--yellow);font-weight:850}.red{color:var(--red);font-weight:850}.purple{color:var(--purple);font-weight:850}.callout{border:1px solid rgba(96,165,250,.45);background:rgba(96,165,250,.10);border-radius:18px;padding:18px}.warn{border-color:rgba(251,191,36,.55);background:rgba(251,191,36,.10)}@media(max-width:900px){.grid,.grid.two{grid-template-columns:1fr}}
+</style></head><body><main class="wrap">
+<header>
+<h1>Full recursive RLM depth-1</h1>
+<p class="big">This run used the official Recursive Language Models scaffold with one child-RLM layer enabled and required at least one child RLM call per task.</p>
+<div class="pillrow"><span class="pill">real BABILong + OOLONG</span><span class="pill">250 new runs</span><span class="pill">all without compaction</span><span class="pill">no baseline reruns</span></div>
+</header>
+
+<section><h2>What changed from depth-0?</h2><div class="grid">
+<div class="card"><h3>Depth-0</h3><p>The root model writes Python over the external source. No sub-LM or child-RLM calls.</p></div>
+<div class="card"><h3>Depth-1 recursive</h3><p>The root model still writes Python, but it must call a child RLM at least once using <code>rlm_query</code>-style helpers.</p></div>
+<div class="card"><h3>Verified recursion</h3><p>After rerunning four violating rows, <strong>250/250</strong> tasks had at least one child RLM call. Total child calls: <strong>658</strong>.</p></div>
+</div></section>
+
+<section><h2>Simple names used below</h2><div class="callout"><p><strong>Auto evidence search</strong> is the plain-English name for the code arm called <code>virtual_context</code>. It is like an automatic multi-file grep: the system searches/scans many chunks first, picks a small evidence packet, and gives only that evidence to the model.</p><p class="muted">Important: it is not literally the model running grep. The model used <strong>0 tools</strong> in those rows; the harness did the evidence selection before the model answered.</p></div></section>
+
+<section><h2>Top-line result</h2><div class="grid">
+<div class="card"><h3>Strict score</h3><div class="metric yellow">47/250</div><p>18.8% strict correct.</p></div>
+<div class="card"><h3>Relaxed score</h3><div class="metric yellow">66/250</div><p>26.4% with harmless formatting fixes.</p></div>
+<div class="card"><h3>Runtime</h3><div class="metric red">220s</div><p>Average per task. This was the slowest arm by a large margin.</p></div>
+</div><p class="muted">Run root: <code>artifacts/batches/rlm_repl_depth1_recursive_babilong_oolong_250/20260520-013636</code>. Four rows were rerun to satisfy the child-call requirement: <code>20260520-013636_rerun_nochild</code>.</p></section>
+
+<section><h2>Compared with the existing arms</h2>
+<table><thead><tr><th>Arm</th><th>Compaction</th><th>Strict correct</th><th>Relaxed correct</th><th>Avg duration</th></tr></thead><tbody>
+<tr><td><code>full_context</code></td><td>without compaction</td><td>36/250</td><td>89/250</td><td>15.9s</td></tr>
+<tr><td><code>grep_file</code></td><td>without compaction</td><td>52/250</td><td>93/250</td><td>26.1s</td></tr>
+<tr><td><code>paged_context</code></td><td>without compaction</td><td>37/250</td><td>87/250</td><td>29.8s</td></tr>
+<tr><td><strong>auto evidence search</strong> (8k)<br><code>virtual_context_8k</code></td><td>without compaction</td><td>59/250</td><td><span class="green">99/250</span></td><td>12.8s</td></tr>
+<tr><td><strong>auto evidence search</strong> (24k)<br><code>virtual_context_24k</code></td><td>without compaction</td><td>62/250</td><td>98/250</td><td>12.9s</td></tr>
+<tr><td><code>rlm_repl_depth0</code></td><td>without compaction</td><td><span class="green">74/250</span></td><td>83/250</td><td>86.6s</td></tr>
+<tr><td><code>rlm_repl_depth1_recursive</code></td><td>without compaction</td><td>47/250</td><td>66/250</td><td><span class="red">220.0s</span></td></tr>
+</tbody></table>
+</section>
+
+<section><h2>Dataset split</h2>
+<table><thead><tr><th>Dataset</th><th>Depth-1 recursive</th><th>Depth-0</th><th>Best current non-RLM result</th><th>Readout</th></tr></thead><tbody>
+<tr><td>BABILong 128k</td><td>39/100 strict, 55/100 relaxed</td><td><strong>51/100 strict</strong>, 60/100 relaxed</td><td>Auto evidence search: 34/100 strict, 68/100 relaxed</td><td>Recursive calls hurt exact BABILong retrieval compared with simple code-over-context.</td></tr>
+<tr><td>OOLONG-real</td><td>8/150 strict, 11/150 relaxed</td><td>23/150 strict</td><td>Paged/full: 30/150 strict; auto evidence 8k/24k: 28/150 strict</td><td>The child RLMs did not learn the transcript counting rules reliably. They often counted mentions rather than benchmark roll/spell events.</td></tr>
+</tbody></table>
+</section>
+
+<section><h2>Paired strict comparisons</h2>
+<table><thead><tr><th>Comparison</th><th>Depth-1 recursive only correct</th><th>Other only correct</th><th>Both correct</th><th>Both wrong</th></tr></thead><tbody>
+<tr><td>vs <code>rlm_repl_depth0</code></td><td>11</td><td>38</td><td>36</td><td>165</td></tr>
+<tr><td>vs <code>grep_file</code></td><td>25</td><td>30</td><td>22</td><td>173</td></tr>
+<tr><td>vs <strong>auto evidence search</strong> (8k)<br><code>virtual_context_8k</code></td><td>17</td><td>29</td><td>30</td><td>174</td></tr>
+<tr><td>vs <code>full_context</code></td><td>37</td><td>26</td><td>10</td><td>177</td></tr>
+</tbody></table>
+</section>
+
+<section><h2>Conclusion</h2><div class="callout warn"><p><strong>Depth-1 recursion was implemented and verified, but it did not improve results.</strong> It was slower and less accurate than depth-0, grep, and auto evidence search on this fixed panel.</p><p>The likely reason is not that recursion is useless. It is that generic child RLM prompts are a poor fit for OOLONG’s event-counting semantics. OOLONG needs structured roll/spell operators or trained counting prompts, not unconstrained recursive summarization.</p></div></section>
+
+<section><h2>Files</h2><table><tbody>
+<tr><th>Main depth-1 run</th><td><code>artifacts/batches/rlm_repl_depth1_recursive_babilong_oolong_250/20260520-013636</code></td></tr>
+<tr><th>Rerun for child-call compliance</th><td><code>artifacts/batches/rlm_repl_depth1_recursive_babilong_oolong_250/20260520-013636_rerun_nochild</code></td></tr>
+<tr><th>Merged analysis</th><td><code>artifacts/analysis/rlm_depth1_recursive_merged_os_levels</code></td></tr>
+<tr><th>Runner</th><td><code>scripts/run/run_rlm_codex_parallel.py</code></td></tr>
+</tbody></table></section>
+</main></body></html>

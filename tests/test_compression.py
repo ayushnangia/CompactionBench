@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from compactionbench.compression import compress_context, compress_task_row, normalize_policy_name
-from compactionbench.schema import TaskRow
+from compactionbench.memory.compression import compress_context, compress_task_row, normalize_policy_name
+from compactionbench.core.schema import TaskRow
 
 
 def _row() -> TaskRow:

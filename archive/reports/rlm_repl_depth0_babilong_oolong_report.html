@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Recursive Language Models depth-0 on BABILong and OOLONG</title>
+<style>
+:root{--bg:#08111f;--panel:#111c2e;--panel2:#17263d;--text:#eef6ff;--muted:#aebbd0;--line:#2b3d5a;--blue:#60a5fa;--green:#34d399;--yellow:#fbbf24;--red:#fb7185;--purple:#c084fc}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 12% 0%,rgba(96,165,250,.22),transparent 34rem),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.55}.wrap{max-width:1180px;margin:0 auto;padding:42px 22px 82px}header,section{border:1px solid var(--line);background:rgba(17,28,46,.94);border-radius:24px;padding:28px;margin:0 0 20px;box-shadow:0 20px 60px rgba(0,0,0,.32)}h1{font-size:clamp(34px,6vw,66px);line-height:1;letter-spacing:-.055em;margin:0 0 14px}h2{font-size:clamp(24px,3vw,38px);line-height:1.1;letter-spacing:-.035em;margin:0 0 14px}h3{margin:0 0 8px}p{margin:0 0 12px}.big{font-size:20px;color:#dbeafe}.muted{color:var(--muted)}.pillrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.pill{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:#0b1020;color:#dbeafe;font-size:14px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.grid.two{grid-template-columns:repeat(2,1fr)}.card{border:1px solid var(--line);border-radius:18px;background:rgba(23,38,61,.86);padding:18px}.metric{font-size:38px;font-weight:950;letter-spacing:-.05em;line-height:1;margin:8px 0}table{width:100%;border-collapse:collapse;margin-top:12px;border-radius:14px;overflow:hidden}th,td{border:1px solid var(--line);padding:11px 13px;text-align:left;vertical-align:top}th{background:#0b1020}td{background:rgba(11,16,32,.38)}code{background:#0b1020;border:1px solid var(--line);border-radius:8px;padding:2px 5px}.green{color:var(--green);font-weight:850}.blue{color:var(--blue);font-weight:850}.yellow{color:var(--yellow);font-weight:850}.red{color:var(--red);font-weight:850}.purple{color:var(--purple);font-weight:850}.callout{border:1px solid rgba(52,211,153,.45);background:rgba(52,211,153,.10);border-radius:18px;padding:18px}.warn{border-color:rgba(251,191,36,.55);background:rgba(251,191,36,.10)}@media(max-width:900px){.grid,.grid.two{grid-template-columns:1fr}}
+</style>
+</head>
+<body><main class="wrap">
+<header>
+<h1>Recursive Language Models depth-0</h1>
+<p class="big">A new benchmark arm using the official RLM repository: the long text lives outside the model prompt, and the model writes Python over it in a REPL.</p>
+<div class="pillrow"><span class="pill">real BABILong + OOLONG only</span><span class="pill">250 new RLM runs</span><span class="pill">no baseline reruns</span><span class="pill">without compaction: 0 events</span></div>
+</header>
+
+<section>
+<h2>Plain-English setup</h2>
+<div class="grid">
+<div class="card"><h3>What RLM means here</h3><p><strong>Recursive Language Model</strong>, not RM3/relevance retrieval. The run used the cloned upstream repo at <code>artifacts/repos/rlm</code>.</p></div>
+<div class="card"><h3>Depth-0 only</h3><p>The model could write code over <code>context</code> and <code>context.txt</code>. It was told not to call sub-LLMs. Observed sub-LLM calls: <strong>0</strong>.</p></div>
+<div class="card"><h3>Compaction label</h3><p>All rows in this report are <strong>without compaction</strong>. There is no compacted RLM arm yet, so do not read this as a with-vs-without compaction ablation.</p></div>
+</div>
+</section>
+
+<section>
+<h2>Top-line result</h2>
+<div class="grid">
+<div class="card"><h3>RLM depth-0 strict</h3><div class="metric green">74/250</div><p>29.6% exact/strict correct.</p></div>
+<div class="card"><h3>RLM depth-0 relaxed</h3><div class="metric yellow">83/250</div><p>33.2% after harmless formatting fixes.</p></div>
+<div class="card"><h3>Operational cost</h3><div class="metric blue">86.6s</div><p>Average duration per task; slower than the other arms.</p></div>
+</div>
+<p class="muted">RLM depth-0 had 250/250 resolved runs, 248/250 parseable final JSON answers, 0 compaction events, and 0 observed sub-LLM calls. Inner Codex calls still produced some harmless command-tool events in 86 runs; these are logged, not hidden.</p>
+</section>
+
+<section>
+<h2>All arms on the same fixed 250 tasks</h2>
+<table><thead><tr><th>Arm</th><th>Compaction</th><th>Strict correct</th><th>Relaxed correct</th><th>Avg tools/run</th><th>Avg duration</th></tr></thead><tbody>
+<tr><td><code>full_context</code></td><td>without compaction</td><td>36/250 (14.4%)</td><td>89/250 (35.6%)</td><td>0.00</td><td>15.9s</td></tr>
+<tr><td><code>grep_file</code></td><td>without compaction</td><td>52/250 (20.8%)</td><td>93/250 (37.2%)</td><td>4.32</td><td>26.1s</td></tr>
+<tr><td><code>paged_context</code></td><td>without compaction</td><td>37/250 (14.8%)</td><td>87/250 (34.8%)</td><td>5.30</td><td>29.8s</td></tr>
+<tr><td><code>virtual_context_8k</code></td><td>without compaction</td><td>59/250 (23.6%)</td><td><span class="green">99/250 (39.6%)</span></td><td>0.00</td><td>12.8s</td></tr>
+<tr><td><code>virtual_context_24k</code></td><td>without compaction</td><td>62/250 (24.8%)</td><td>98/250 (39.2%)</td><td>0.00</td><td>12.9s</td></tr>
+<tr><td><code>virtual_context_48k</code></td><td>without compaction</td><td>60/250 (24.0%)</td><td>97/250 (38.8%)</td><td>0.00</td><td>13.9s</td></tr>
+<tr><td><code>rlm_repl_depth0</code></td><td>without compaction</td><td><span class="green">74/250 (29.6%)</span></td><td>83/250 (33.2%)</td><td>0.89</td><td>86.6s</td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>Where RLM helped and where it did not</h2>
+<table><thead><tr><th>Dataset</th><th>RLM depth-0</th><th>Best comparison</th><th>Plain-English read</th></tr></thead><tbody>
+<tr><td>BABILong 128k</td><td><strong>51/100 strict</strong>, 60/100 relaxed</td><td>Virtual context: 34/100 strict, 68/100 relaxed; grep: 23/100 strict, 63/100 relaxed</td><td>RLM code-over-context was strong on exact BABILong answers, but many strict misses were just answer formatting.</td></tr>
+<tr><td>OOLONG-real</td><td>23/150 strict, 23/150 relaxed</td><td>Grep: 29/150 strict; paged: 30/150 strict; virtual 8k/24k: 28/150 strict</td><td>Depth-0 RLM did not solve OOLONG. It needs semantic counting/aggregation, likely the depth-1 sub-LLM version.</td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>Paired comparisons</h2>
+<table><thead><tr><th>Comparison</th><th>RLM only correct</th><th>Other only correct</th><th>Both correct</th><th>Both wrong</th></tr></thead><tbody>
+<tr><td>RLM vs <code>grep_file</code></td><td><span class="green">38</span></td><td>16</td><td>36</td><td>160</td></tr>
+<tr><td>RLM vs <code>virtual_context_8k</code></td><td>37</td><td>22</td><td>37</td><td>154</td></tr>
+<tr><td>RLM vs <code>virtual_context_24k</code></td><td>37</td><td>25</td><td>37</td><td>151</td></tr>
+<tr><td>RLM vs <code>full_context</code></td><td>54</td><td>16</td><td>20</td><td>160</td></tr>
+</tbody></table>
+<p class="muted">These are strict-correct counts. Continuous numeric scores tell a softer story on OOLONG, where near misses can get partial credit.</p>
+</section>
+
+<section>
+<h2>Conclusion</h2>
+<div class="callout"><p><strong>RLM depth-0 is a real new arm and it changes the picture:</strong> on strict scoring it beat grep and the current virtual-context variants overall, mainly because it was much better on BABILong exact memory retrieval.</p><p><strong>But it is not the final answer:</strong> it was slower, its relaxed score was below virtual context, and it underperformed on OOLONG. The next meaningful RLM test is <code>rlm_repl_depth1</code>, where code can ask sub-LLMs to label chunks and then aggregate the results.</p></div>
+</section>
+
+<section>
+<h2>Files</h2>
+<table><tbody>
+<tr><th>RLM run root</th><td><code>artifacts/batches/rlm_repl_depth0_babilong_oolong_250/20260519-212114</code></td></tr>
+<tr><th>Merged analysis</th><td><code>artifacts/analysis/rlm_repl_depth0_merged_os_levels</code></td></tr>
+<tr><th>Runner</th><td><code>scripts/run/run_rlm_codex_parallel.py</code></td></tr>
+<tr><th>Fixed panel</th><td><code>data/benchmarks/confirmation/real_lossless_250.jsonl</code></td></tr>
+</tbody></table>
+</section>
+</main></body></html>

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from compactionbench.score import score_one, score_value_one
+from compactionbench.core.score import score_one, score_value_one
 
 
 def test_numeric_075_partial_credit() -> None:

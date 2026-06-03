@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from compactionbench.babilong_hierarchy import build_babilong_state_packet, build_babilong_state_prompt, extract_babi_state
+from compactionbench.memory.babilong_hierarchy import build_babilong_state_packet, build_babilong_state_prompt, extract_babi_state
 
 
 def test_extract_babi_state_handles_pair_and_they_coreference() -> None:

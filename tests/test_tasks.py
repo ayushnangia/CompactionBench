@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from compactionbench.tasks import (
+from compactionbench.taskgen.synthetic import (
     generate_all_synthetic_tasks,
     generate_counting_tasks,
     generate_entity_binding_tasks,
