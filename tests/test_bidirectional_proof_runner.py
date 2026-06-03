@@ -50,14 +50,19 @@ def test_bidirectional_quote_metadata_validates_only_presence(tmp_path: Path) ->
     (tmp_path / "proof_packet.json").write_text(
         '{"claims":[{"claim":"a","source_quote":"alpha beta"},{"claim":"b","source_quote":"missing quote"}]}'
     )
+    (tmp_path / "proof_audit.json").write_text(
+        '{"checks":[{"evidence":"beta gamma"}],"status":"checked"}'
+    )
 
     meta = runner.read_bidirectional_proof_metadata(tmp_path, context="alpha beta gamma")
 
     assert meta["proof_json_exists"] is True
     assert meta["proof_json_parse_ok"] is True
-    assert meta["source_quote_count"] == 2
-    assert meta["source_quotes_present_exact"] == 1
-    assert meta["source_quotes_present_normalized"] == 1
+    assert meta["proof_audit_exists"] is True
+    assert meta["proof_audit_parse_ok"] is True
+    assert meta["source_quote_count"] == 3
+    assert meta["source_quotes_present_exact"] == 2
+    assert meta["source_quotes_present_normalized"] == 2
 
 
 def test_build_jobs_accepts_bidirectional_proof_arm() -> None:

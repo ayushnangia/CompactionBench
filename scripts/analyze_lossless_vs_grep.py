@@ -113,6 +113,7 @@ def main() -> int:
                 memory_meta.get("evidence_tokens_est")
                 or memory_meta.get("notes_tokens_est")
                 or memory_meta.get("proof_json_tokens_est")
+                or memory_meta.get("proof_audit_tokens_est")
                 or memory_meta.get("proof_md_tokens_est")
                 or 0
             ) if isinstance(memory_meta, dict) else 0

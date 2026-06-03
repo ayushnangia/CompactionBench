@@ -1038,27 +1038,30 @@ def build_bidirectional_proof_prompt(task: TaskRow) -> str:
     return (
         "You are running the BIDIRECTIONAL PROOF MEMORY arm.\n"
         "The full source is saved in ./context.txt. Do not use the web.\n"
-        "No domain or benchmark categories are provided. Do not assume any fixed ontology.\n"
+        "No domain or benchmark categories are provided. Do not assume any fixed ontology or task-specific labels beyond what the question/source reveal.\n"
         "Induce the temporary schema/contract needed for this question only from the question and the source evidence you inspect.\n"
         "Work as a meet-in-the-middle proof search:\n"
-        "1. Write a task-local query contract: expected answer shape, variables, constraints, and what kind of evidence would prove it.\n"
-        "2. Search ./context.txt using shell/python as needed.\n"
-        "3. From the context side, discover cited evidence handles: exact quotes/spans that may support or refute candidate answers.\n"
-        "4. Build a minimal proof path from the query contract to the evidence. Check for contradictory or newer/refuting evidence if relevant.\n"
+        "1. Write a task-local query contract: answer shape, variables, constraints, and what evidence would prove or refute candidate answers.\n"
+        "2. Search ./context.txt using shell/python as needed. For whole-context totals, frequencies, ordering, or extrema, do not rely on sampled snippets: write and run an exhaustive source-derived extraction/check script over context.txt.\n"
+        "3. From the context side, discover cited evidence handles: exact quotes/spans and any source-derived computation logs that support or refute candidate answers.\n"
+        "4. Build a minimal proof path from the query contract to the evidence. Run an independent audit with different search terms or a second script when feasible.\n"
         "5. Write ./proof_packet.json. Use only generic fields; do not rely on predefined semantic categories.\n"
+        "6. Write ./proof_audit.json with generic checks: files/commands used, whether evidence was exhaustive or sampled, quote/provenance checks, unresolved risks, and whether the answer is proven/refuted/unknown.\n"
         "The proof packet should be a JSON object with keys like query_contract, induced_schema, search_trace, claims, proof_steps, contradiction_checks, answer.\n"
-        "Every claim should include an exact source_quote copied from context.txt when possible.\n"
-        "After writing proof_packet.json, return exactly one JSON object with one field: {\"answer\": \"...\"}. Do not include extra text.\n"
-        "If evidence is insufficient, answer unknown.\n"
+        "Every claim should include an exact source_quote copied from context.txt when possible; computed claims should include the command/script and source-derived intermediate counts or rows.\n"
+        "Only answer with a non-unknown value if the proof and audit support it. Otherwise answer unknown.\n"
+        "After writing proof_packet.json and proof_audit.json, return exactly one JSON object with one field: {\"answer\": \"...\"}. Do not include extra text.\n"
         f"Question:\n{task.question}\n"
     )
 
 
 def read_bidirectional_proof_metadata(cwd: Path, *, context: str) -> dict[str, Any]:
     json_path = cwd / "proof_packet.json"
+    audit_path = cwd / "proof_audit.json"
     md_path = cwd / "proof_packet.md"
     metadata: dict[str, Any] = {
         "proof_json_exists": json_path.exists(),
+        "proof_audit_exists": audit_path.exists(),
         "proof_md_exists": md_path.exists(),
     }
     packet: Any = None
@@ -1079,6 +1082,24 @@ def read_bidirectional_proof_metadata(cwd: Path, *, context: str) -> dict[str, A
             metadata["proof_json_error"] = f"{type(e).__name__}: {e}"
     else:
         metadata["proof_json_parse_ok"] = False
+    audit: Any = None
+    if audit_path.exists():
+        audit_text = audit_path.read_text(errors="replace")
+        metadata.update(
+            {
+                "proof_audit_chars": len(audit_text),
+                "proof_audit_tokens_est": estimate_tokens(audit_text),
+                "proof_audit_preview": preview(audit_text, 700),
+            }
+        )
+        try:
+            audit = json.loads(audit_text)
+            metadata["proof_audit_parse_ok"] = True
+        except Exception as e:
+            metadata["proof_audit_parse_ok"] = False
+            metadata["proof_audit_error"] = f"{type(e).__name__}: {e}"
+    else:
+        metadata["proof_audit_parse_ok"] = False
     if md_path.exists():
         md_text = md_path.read_text(errors="replace")
         metadata.update(
@@ -1088,7 +1109,7 @@ def read_bidirectional_proof_metadata(cwd: Path, *, context: str) -> dict[str, A
                 "proof_md_preview": preview(md_text, 700),
             }
         )
-    quotes = _extract_generic_source_quotes(packet)
+    quotes = _extract_generic_source_quotes(packet) + _extract_generic_source_quotes(audit)
     checked = []
     for quote in quotes[:80]:
         normalized = " ".join(quote.split())
