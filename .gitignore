@@ -1,45 +1,102 @@
-# Python
+# Python bytecode and native build output
 __pycache__/
-*.py[cod]
+*.py[codz]
 *$py.class
+*.so
+
+# Packaging and builds
+/.Python
 *.egg-info/
 .eggs/
-build/
-dist/
+/build/
+/dist/
+/downloads/
+/eggs/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
+/wheels/
+/share/python-wheels/
+*.egg
+.installed.cfg
+MANIFEST
+*.manifest
+*.spec
 
-# Virtualenv
-.venv/
-venv/
-env/
+# Python environments
+/.env
+/.env.*
+!/.env.example
+/.envrc
+/.venv/
+/venv/
+/env/
+/ENV/
+/env.bak/
+/venv.bak/
+__pypackages__/
 
-# uv
-.uv/
+# uv local state. Keep uv.lock tracked for reproducible runs.
+/.uv/
 
-# IDE / OS
-.vscode/
-.idea/
-.DS_Store
-*.swp
-
-# Local config
-.env
-.pi/
-.ralph/
-
-# Pytest / coverage
-.pytest_cache/
+# Test, lint, type-check, and coverage output
+/.pytest_cache/
+/.ruff_cache/
+/.mypy_cache/
+/.dmypy.json
+/dmypy.json
+/.pyre/
+/.pytype/
+/.tox/
+/.nox/
+/.hypothesis/
 .coverage
 .coverage.*
-htmlcov/
+/htmlcov/
 coverage.xml
+*.cover
+*.py.cover
+*.lcov
+/cover/
 
-# Jupyter
+# Docs and notebook build output
 .ipynb_checkpoints/
+docs/_build/
+/site/
+
+# IDE, OS, and editor noise
+/.vscode/
+/.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Local agent/tool state
+/.claude/
+/.codex/
+/.pi/
+/.ralph/
 
 # Benchmark outputs
-artifacts/
-data/benchmarks/*
-!data/benchmarks/README.md
+/artifacts/
+/data/benchmarks/*
+!/data/benchmarks/
+!/data/benchmarks/README.md
+
+# Local logs and downloaded archives
+*.log
+*.tmp
+/*.tar
+/*.tar.gz
+/*.tgz
+/*.zip
+/*.gz
+/*.bz2
+/*.xz
 
 # Tool session dumps
 *-this-session-is-being-continued-from-a-previous-*.txt

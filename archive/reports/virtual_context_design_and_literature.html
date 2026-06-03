@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Virtual Context Memory — Design + Literature</title>
+<style>
+:root{--bg:#0b1020;--panel:#111827;--panel2:#172033;--text:#eef4ff;--muted:#a9b6ca;--line:#2a3852;--blue:#60a5fa;--green:#34d399;--yellow:#fbbf24;--red:#fb7185;--purple:#c084fc}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 8% 0%,rgba(96,165,250,.22),transparent 34rem),radial-gradient(circle at 92% 8%,rgba(192,132,252,.15),transparent 30rem),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.55}.wrap{max-width:1220px;margin:0 auto;padding:42px 22px 80px}header,section{border:1px solid var(--line);background:rgba(17,24,39,.94);border-radius:26px;box-shadow:0 18px 55px rgba(0,0,0,.35);padding:30px;margin-bottom:22px}h1{font-size:clamp(36px,6vw,72px);line-height:1;letter-spacing:-.055em;margin:0 0 14px}h2{font-size:clamp(24px,3vw,38px);line-height:1.1;letter-spacing:-.035em;margin:0 0 16px}h3{font-size:20px;margin:0 0 8px}p{margin:0 0 12px}.big{font-size:20px;color:#dbeafe}.muted{color:var(--muted)}.pillrow{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}.pill{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(11,16,32,.55);color:#dbeafe;font-size:14px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.grid.two{grid-template-columns:repeat(2,1fr)}.card{border:1px solid var(--line);border-radius:20px;background:rgba(23,32,51,.85);padding:20px}.green{color:var(--green);font-weight:850}.blue{color:var(--blue);font-weight:850}.yellow{color:var(--yellow);font-weight:850}.red{color:var(--red);font-weight:850}.purple{color:var(--purple);font-weight:850}.callout{border-radius:20px;padding:22px;border:1px solid rgba(52,211,153,.45);background:rgba(52,211,153,.10)}.warn{border-color:rgba(251,191,36,.48);background:rgba(251,191,36,.10)}.bad{border-color:rgba(251,113,133,.48);background:rgba(251,113,133,.10)}table{width:100%;border-collapse:collapse;margin-top:14px;border-radius:16px;overflow:hidden;font-size:15px}th,td{border:1px solid var(--line);padding:12px 14px;text-align:left;vertical-align:top}th{background:#0b1020;color:#e5efff}td{background:rgba(11,16,32,.36)}code,pre{background:#0b1020;border:1px solid var(--line);border-radius:12px}code{padding:2px 5px}pre{padding:16px;white-space:pre-wrap;word-break:break-word;color:#dbeafe}.diagram{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:12px;align-items:stretch}.box{border:1px solid var(--line);border-radius:18px;background:rgba(23,32,51,.92);padding:18px}.arrow{font-size:34px;color:var(--blue);font-weight:900;display:flex;align-items:center}.quote{border-left:4px solid var(--blue);padding-left:16px;color:#dbeafe;font-size:18px;margin:12px 0}.small{font-size:13px}@media(max-width:900px){.grid,.grid.two,.diagram{grid-template-columns:1fr}.arrow{transform:rotate(90deg);justify-content:center}header,section{padding:22px}}
+</style>
+</head>
+<body><main class="wrap">
+<header>
+<h1>Virtual Context Memory</h1>
+<p class="big">How the memory kernel, hidden page table, retrieval rules, and evidence packet are built — and how this relates to existing literature.</p>
+<div class="pillrow"><span class="pill">system-managed memory</span><span class="pill">not model-managed grep</span><span class="pill">RAG-inspired</span><span class="pill">OS paging analogy</span><span class="pill">still prototype</span></div>
+</header>
+
+<section>
+<h2>First: are we sure this is the best formulation?</h2>
+<div class="callout"><p><strong>Best current formulation:</strong> call it <span class="green">Virtual Context Memory</span>, but be precise: the implementation is currently <strong>transparent prefetch / resident-set selection</strong>, not a complete OS with real page faults yet.</p><p>So the honest claim is:</p><pre>We move retrieval and page selection out of the model and into a system memory kernel. The model receives a resident evidence packet instead of manually searching pages.</pre></div>
+<div class="grid two" style="margin-top:16px">
+<div class="card"><h3>Good name for the idea</h3><p><strong>Virtual Context Memory</strong></p><p class="muted">Good because it captures the OS analogy and the goal: context larger than the prompt, mediated by a memory system.</p></div>
+<div class="card"><h3>More precise method name</h3><p><strong>Transparent Resident-Set Retrieval</strong></p><p class="muted">Good for papers because it avoids overclaiming full OS paging before page faults/eviction are implemented.</p></div>
+</div>
+</section>
+
+<section>
+<h2>How it is built, step by step</h2>
+<div class="diagram">
+<div class="box"><h3>1. Source text</h3><p>The original long context stays intact.</p><pre>task.context
+100k+ tokens
+BABILong / OOLONG transcript</pre></div>
+<div class="arrow">→</div>
+<div class="box"><h3>2. Page writer</h3><p><code>write_paged_memory(...)</code> splits the source into overlapping page files.</p><pre>virtual_memory/
+  pages/page_000001.txt
+  pages/page_000002.txt
+  page_index.jsonl
+  manifest.json</pre></div>
+<div class="arrow">→</div>
+<div class="box"><h3>3. Hidden page table</h3><p>The page index records page id, file path, line range, token estimate, and preview.</p><pre>{page_id: 77,
+ file: pages/page_000077.txt,
+ lines: 2932-2998,
+ preview: ...}</pre></div>
+</div>
+<div class="diagram" style="grid-template-columns:1fr auto 1fr auto 1fr;margin-top:12px">
+<div class="box"><h3>4. Retrieval rules</h3><p><code>build_virtual_context_packet(...)</code> scores/selects evidence outside the model.</p><pre>BABILong: event trace extractor
+OOLONG: roll/spell windows
+generic: question-term page scoring</pre></div>
+<div class="arrow">→</div>
+<div class="box"><h3>5. Evidence packet</h3><p>The selected resident working set is rendered into the prompt.</p><pre>&lt;VIRTUAL_CONTEXT_EVIDENCE&gt;
+Evidence 1: ...
+Evidence 2: ...
+&lt;/VIRTUAL_CONTEXT_EVIDENCE&gt;</pre></div>
+<div class="arrow">→</div>
+<div class="box"><h3>6. Model answer</h3><p>The model does not see <code>pager.py</code> and does not run grep.</p><pre>{"answer":"bathroom"}</pre></div>
+</div>
+</section>
+
+<section>
+<h2>What exactly is the “memory kernel”?</h2>
+<p>The memory kernel is not a separate daemon yet. It is the harness code that runs before the model call.</p>
+<table><thead><tr><th>Component</th><th>Current implementation</th><th>Role</th></tr></thead><tbody>
+<tr><td>Page construction</td><td><code>compactionbench.paged_context.write_paged_memory</code></td><td>Turns long source into stable pages and an index.</td></tr>
+<tr><td>Virtual packet builder</td><td><code>compactionbench.virtual_context.build_virtual_context_packet</code></td><td>Selects the model's resident evidence set.</td></tr>
+<tr><td>BABILong extractor</td><td>Regex event trace for movement, pickup/drop, transfer, spatial facts.</td><td>Filters out carrier prose and keeps concise benchmark facts.</td></tr>
+<tr><td>OOLONG retriever</td><td>Question/domain-term windows around rolls, spells, casts, natural values, etc.</td><td>Finds potentially relevant transcript spans.</td></tr>
+<tr><td>Prompt renderer</td><td><code>build_virtual_context_prompt</code></td><td>Gives evidence to the model without page-tool instructions.</td></tr>
+<tr><td>Audit metadata</td><td>RunRecord <code>metadata.virtual_context</code></td><td>Records selected pages, item previews, evidence tokens, strategy.</td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>Current algorithm in plain pseudocode</h2>
+<pre>def answer_with_virtual_context(source, question):
+    pages = split_source_into_pages(source)
+    page_table = build_hidden_index(pages)
+
+    if benchmark == "BABILong":
+        evidence = extract_babi_event_trace(pages, question)
+    elif benchmark == "OOLONG":
+        evidence = retrieve_roll_spell_windows(pages, question)
+    else:
+        evidence = score_pages_by_question_terms(pages, question)
+
+    packet = fit_evidence_to_budget(evidence)
+    prompt = render_prompt(question, packet)
+    answer = model(prompt, tools_disabled=True)
+    record_audit_trail(packet)
+    return answer</pre>
+</section>
+
+<section>
+<h2>Why this is different from grep</h2>
+<table><thead><tr><th>grep_file</th><th>virtual_context</th></tr></thead><tbody>
+<tr><td>Model chooses search terms.</td><td>System chooses retrieval strategy.</td></tr>
+<tr><td>Model reads raw grep output.</td><td>Model reads curated evidence packet.</td></tr>
+<tr><td>Model can chase wrong local matches.</td><td>System can filter/structure evidence first.</td></tr>
+<tr><td>Useful but model-managed.</td><td>More OS-like: system-managed.</td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>Literature map</h2>
+<p class="muted">I could not query alphaXiv live in this environment because alpha was not logged in / CLI unavailable, so this map is from known relevant literature. These are the papers I would cite/check first.</p>
+<table><thead><tr><th>Line of work</th><th>Relevant papers</th><th>Relation to our formulation</th></tr></thead><tbody>
+<tr><td>Classic RAG</td><td>Lewis et al., 2020, <em>Retrieval-Augmented Generation for Knowledge-Intensive NLP</em>; Guu et al., 2020, <em>REALM</em>; Izacard & Grave, 2021/2022, <em>FiD / Atlas</em></td><td>Retrieve documents before generation. Our virtual context is a system-managed RAG variant with page/resident-set framing.</td></tr>
+<tr><td>Retrieval at scale / retrieval-enhanced LMs</td><td>Borgeaud et al., 2022, <em>RETRO</em>; Khandelwal et al., 2020, <em>kNN-LM</em></td><td>External memory improves language modeling. Our setting is agent/task answering over source pages, not token-level retrieval.</td></tr>
+<tr><td>Agent/tool retrieval</td><td>Yao et al., 2022/2023, <em>ReAct</em>; Schick et al., 2023, <em>Toolformer</em>; active retrieval approaches like FLARE/Self-RAG</td><td>Model decides when/how to retrieve. This corresponds more to our <code>grep_file</code> and <code>paged_context</code> arms.</td></tr>
+<tr><td>Memory as OS analogy</td><td>Packer et al., 2023, <em>MemGPT: Towards LLMs as Operating Systems</em></td><td>Closest conceptual neighbor. MemGPT explicitly frames context/memory management like OS memory tiers. Our version makes source-page retrieval transparent to the model.</td></tr>
+<tr><td>Long-context failure modes</td><td>Liu et al., 2023, <em>Lost in the Middle</em>; long-context vs retrieval studies</td><td>Supports why full-context prompting can fail even when all text is present.</td></tr>
+<tr><td>Corrective/self-verifying RAG</td><td>Self-RAG, CRAG, verifier/reranker pipelines</td><td>Points to the next step: page-fault retry when evidence is insufficient or unsupported.</td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>Is it the best formulation?</h2>
+<div class="grid two">
+<div class="callout"><h3>Yes, for the research story</h3><p>“Virtual context” is a strong framing because it explains why giant prompts and manual grep are not the final design. Agents need a memory subsystem, not just a bigger prompt.</p><p>It also gives us clean experimental axes: model-managed search vs system-managed memory.</p></div>
+<div class="callout warn"><h3>But tighten the claim</h3><p>Current implementation is <strong>static transparent prefetch</strong>. It is not yet full OS paging because there is no page-fault loop, eviction policy, hard budget enforcement, or learned retrieval index.</p><p>So avoid saying “we built infinite context.” Say “we built a first transparent virtual-context memory arm.”</p></div>
+</div>
+</section>
+
+<section>
+<h2>Better taxonomy for the paper/report</h2>
+<table><thead><tr><th>Level</th><th>Name</th><th>Who manages memory?</th><th>Status</th></tr></thead><tbody>
+<tr><td>0</td><td>Full context</td><td>No one; everything is in prompt</td><td>Baseline</td></tr>
+<tr><td>1</td><td>Monolithic file search</td><td>Model uses grep/tools</td><td>Strong baseline</td></tr>
+<tr><td>2</td><td>Manual paged context</td><td>Model searches/loads pages</td><td>Implemented; not best</td></tr>
+<tr><td>3</td><td>Transparent virtual context</td><td>System selects resident evidence before model call</td><td>Implemented; promising</td></tr>
+<tr><td>4</td><td>Faulted virtual context</td><td>System verifies answer, page-faults, retries</td><td>Next</td></tr>
+<tr><td>5</td><td>Structured virtual context</td><td>System uses task-specific table/count operators</td><td>Needed for OOLONG</td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>What I would change next</h2>
+<ol>
+<li><strong>Hard enforce resident-set budgets.</strong> The 8k/24k/48k labels were not hard enough in the latest run.</li>
+<li><strong>Add a verifier-driven page-fault loop.</strong> If answer is unsupported, retrieve more pages and retry.</li>
+<li><strong>Add typed pages.</strong> BABI event pages, OOLONG roll table pages, spell table pages, conversation-turn pages.</li>
+<li><strong>Add structured operators for OOLONG.</strong> Count rolls, compute percentages, first/last spell by episode/character.</li>
+<li><strong>Use hybrid retrieval.</strong> Lexical search + entity index + embeddings + task-specific extractors.</li>
+<li><strong>Do not re-run baselines.</strong> Reuse fixed-panel baselines and run only new arms.</li>
+</ol>
+</section>
+
+<section>
+<h2>Final recommendation</h2>
+<div class="callout"><p><strong>Keep the formulation, but phrase it carefully:</strong></p><pre>Virtual Context Memory is a system-managed memory layer for long-context agents. It keeps source text outside the model, pages and indexes it, retrieves a resident evidence packet, and lets the model answer without manual search. The current implementation is transparent prefetch; the next version adds page-fault retries and structured operators.</pre></div>
+</section>
+</main></body></html>

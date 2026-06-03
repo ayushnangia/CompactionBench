@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Full Context vs File Search — 500 Real-Data Runs</title>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel:#111827;
+      --panel2:#172033;
+      --text:#eef4ff;
+      --muted:#a9b6ca;
+      --line:#2a3852;
+      --blue:#60a5fa;
+      --green:#34d399;
+      --yellow:#fbbf24;
+      --red:#fb7185;
+      --purple:#c084fc;
+      --cyan:#22d3ee;
+      --shadow:rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      color:var(--text);
+      background:
+        radial-gradient(circle at 10% 0%, rgba(96,165,250,.24), transparent 35rem),
+        radial-gradient(circle at 95% 10%, rgba(192,132,252,.18), transparent 32rem),
+        radial-gradient(circle at 50% 100%, rgba(34,211,238,.10), transparent 34rem),
+        var(--bg);
+      font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height:1.55;
+    }
+    .wrap{max-width:1180px;margin:0 auto;padding:42px 22px 80px}
+    header, section{
+      border:1px solid var(--line);
+      background:rgba(17,24,39,.92);
+      border-radius:26px;
+      box-shadow:0 20px 60px var(--shadow);
+    }
+    header{padding:38px;margin-bottom:24px;background:linear-gradient(135deg, rgba(17,24,39,.96), rgba(23,32,51,.88))}
+    section{padding:30px;margin-top:22px}
+    h1{font-size:clamp(36px,6vw,72px);line-height:1;letter-spacing:-.055em;margin:0 0 14px}
+    h2{font-size:clamp(25px,3.2vw,40px);line-height:1.1;letter-spacing:-.035em;margin:0 0 16px}
+    h3{font-size:20px;margin:0 0 8px}
+    p{margin:0 0 12px}.big{font-size:20px;color:#dbeafe}.muted{color:var(--muted)}.tiny{font-size:13px;color:var(--muted)}
+    strong{color:#fff}.green{color:var(--green);font-weight:800}.blue{color:var(--blue);font-weight:800}.yellow{color:var(--yellow);font-weight:800}.red{color:var(--red);font-weight:800}.purple{color:var(--purple);font-weight:800}
+    .pillrow{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}.pill{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(11,16,32,.55);color:#dbeafe;font-size:14px}
+    .tldr{display:grid;grid-template-columns:1.25fr .75fr;gap:18px;margin-top:22px}.callout{border-radius:20px;padding:22px;border:1px solid rgba(52,211,153,.45);background:rgba(52,211,153,.10)}.callout.warn{border-color:rgba(251,191,36,.48);background:rgba(251,191,36,.10)}.callout.bad{border-color:rgba(251,113,133,.48);background:rgba(251,113,133,.10)}.callout.info{border-color:rgba(96,165,250,.48);background:rgba(96,165,250,.10)}
+    .verdict{font-size:clamp(24px,3.6vw,42px);font-weight:900;letter-spacing:-.04em;line-height:1.12;margin-bottom:12px}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.grid.two{grid-template-columns:repeat(2,1fr)}.grid.four{grid-template-columns:repeat(4,1fr)}
+    .card{border:1px solid var(--line);border-radius:20px;background:rgba(23,32,51,.86);padding:20px;min-height:100%}
+    .metric{font-size:42px;line-height:1;font-weight:950;letter-spacing:-.05em;margin:6px 0 8px}.metric small{font-size:17px;color:var(--muted);letter-spacing:0;font-weight:700}
+    table{width:100%;border-collapse:collapse;margin-top:14px;border-radius:16px;overflow:hidden;font-size:15px}th,td{border:1px solid var(--line);padding:12px 14px;text-align:left;vertical-align:top}th{background:#0b1020;color:#e5efff}td{background:rgba(11,16,32,.36)}
+    .bars{display:grid;gap:13px;margin-top:16px}.barrow{display:grid;grid-template-columns:170px 1fr 80px;gap:12px;align-items:center}.track{height:16px;border:1px solid var(--line);border-radius:999px;background:#0b1020;overflow:hidden}.fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--blue),var(--purple))}.fill.greenfill{background:linear-gradient(90deg,var(--green),var(--cyan))}.fill.yellowfill{background:linear-gradient(90deg,var(--yellow),#fb923c)}
+    .split{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}.arrow{font-size:26px;color:var(--muted);font-weight:900}.flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:12px;align-items:stretch;margin-top:16px}.step{border:1px solid var(--line);border-radius:18px;background:rgba(23,32,51,.86);padding:18px}
+    pre{white-space:pre-wrap;word-break:break-word;background:#0b1020;border:1px solid var(--line);border-radius:16px;padding:16px;color:#dbeafe;margin:12px 0 0;font-size:14px;line-height:1.45}
+    .quote{border-left:4px solid var(--blue);padding-left:16px;color:#dbeafe;font-size:18px;margin:12px 0}.ok{font-weight:850;color:var(--green)}.no{font-weight:850;color:var(--red)}
+    .caption{font-size:13px;color:var(--muted);margin-top:8px}.footer{margin-top:22px;color:var(--muted);font-size:13px;text-align:center}
+    @media(max-width:900px){.tldr,.grid,.grid.two,.grid.four,.split,.flow{grid-template-columns:1fr}.arrow{display:none}.barrow{grid-template-columns:1fr;gap:6px}header,section{padding:22px}.metric{font-size:36px}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <h1>Full context vs file search</h1>
+      <p class="big">We ran the clean control people asked for: <strong>same real tasks</strong>, same model, no chat compression, comparing a direct full-context prompt against a searchable original file.</p>
+      <div class="pillrow">
+        <span class="pill">500 Codex runs</span>
+        <span class="pill">250 real tasks × 2 arms</span>
+        <span class="pill">BABILong + OOLONG-real</span>
+        <span class="pill">no synthetic tasks</span>
+        <span class="pill">0 run failures</span>
+      </div>
+      <div class="tldr">
+        <div class="callout">
+          <div class="verdict">TL;DR: file search won, but not by a landslide.</div>
+          <p><span class="green">File search:</span> 50 / 250 correct = <strong>20%</strong></p>
+          <p><span class="blue">Full context:</span> 40 / 250 correct = <strong>16%</strong></p>
+          <p><strong>Compaction status:</strong> this 500-run control had <span class="green">0 compaction events</span>. It is the non-compacted/lossless comparison.</p>
+          <p>So yes, on this real-data run, searchable source files did better overall than giving the model the whole source directly.</p>
+        </div>
+        <div class="callout warn">
+          <h3>Important nuance</h3>
+          <p>This does <strong>not</strong> mean “grep is always better.”</p>
+          <p>Full context still uniquely solved 15 tasks that grep missed. On OOLONG, exact accuracy tied.</p>
+        </div>
+      </div>
+    </header>
+
+    <section>
+      <h2>What exactly was tested?</h2>
+      <div class="flow">
+        <div class="step">
+          <h3>Same real task</h3>
+          <p>One long source text plus one question and one gold answer.</p>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <h3>Two ways to answer</h3>
+          <p>Either read the whole source in one prompt, or search the source as a file.</p>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step">
+          <h3>Same scoring</h3>
+          <p>We score both answers against the same gold answer.</p>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Arm</th><th>What Codex received</th><th>Tools?</th><th>Compression?</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Full context</strong></td><td>The original source text was placed directly in one prompt, word for word.</td><td>No. The prompt said not to use files or shell commands.</td><td><span class="green">No compaction events observed.</span></td></tr>
+          <tr><td><strong>File search</strong></td><td>The original source text was saved as <code>full_context.txt</code>.</td><td>Yes. Codex could use shell search commands.</td><td><span class="green">No compaction events observed.</span></td></tr>
+        </tbody>
+      </table>
+      <p class="caption">This is different from the earlier long-agent-chat experiment, where old chat messages could be compressed.</p>
+    </section>
+
+    <section>
+      <h2>Compaction status: explicit check</h2>
+      <p>This is the part that separates the two stories.</p>
+      <table>
+        <thead><tr><th>Experiment</th><th>What was run</th><th>Compaction?</th><th>Evidence</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>500-run clean control</strong></td>
+            <td>250 real tasks run as full-context prompt and file-search prompt.</td>
+            <td><span class="green">No compaction</span></td>
+            <td><code>avg_compaction_events = 0.0</code> for both arms; total observed compaction events = <strong>0</strong>.</td>
+          </tr>
+          <tr>
+            <td><strong>Earlier 100-run agent-memory baseline</strong></td>
+            <td>Long context injected over many chat turns into Codex.</td>
+            <td><span class="yellow">Yes, often compacted</span></td>
+            <td><strong>68 / 100</strong> runs had compaction; <strong>240</strong> total compaction events.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="caption">So the 500-run result answers the “true lossless/non-compacted context vs grep” question. The earlier 100-run result answers the “long-running agent chat after compaction” question.</p>
+    </section>
+
+    <section>
+      <h2>The headline numbers</h2>
+      <div class="grid four">
+        <div class="card"><h3>Total runs</h3><div class="metric">500</div><p class="muted">250 tasks × 2 arms</p></div>
+        <div class="card"><h3>Successful runs</h3><div class="metric green">500</div><p class="muted">No subprocess failures</p></div>
+        <div class="card"><h3>Parse success</h3><div class="metric green">100%</div><p class="muted">Every run returned valid JSON</p></div>
+        <div class="card"><h3>Compression events</h3><div class="metric blue">0</div><p class="muted">This was the lossless-control run</p></div>
+      </div>
+      <div class="bars">
+        <div class="barrow"><strong>Full context</strong><div class="track"><div class="fill" style="width:16%"></div></div><span>16%</span></div>
+        <div class="barrow"><strong>File search</strong><div class="track"><div class="fill greenfill" style="width:20%"></div></div><span>20%</span></div>
+      </div>
+      <p class="caption">Accuracy is strict deterministic correctness. Some OOLONG numeric answers can be close but not counted as fully correct.</p>
+    </section>
+
+    <section>
+      <h2>Dataset breakdown</h2>
+      <table>
+        <thead><tr><th>Dataset</th><th>Tasks</th><th>Full context</th><th>File search</th><th>Plain-English read</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>BABILong 128k</strong><br><span class="muted">Exact hidden facts</span></td>
+            <td>100</td>
+            <td><span class="blue">7 / 100</span> = 7%</td>
+            <td><span class="green">17 / 100</span> = 17%</td>
+            <td>File search helped a lot more here. This is the strongest support for “search beats reading” on exact needle-style tasks.</td>
+          </tr>
+          <tr>
+            <td><strong>OOLONG-real</strong><br><span class="muted">D&D transcript counts/spells/rolls</span></td>
+            <td>150</td>
+            <td><span class="blue">33 / 150</span> = 22%</td>
+            <td><span class="green">33 / 150</span> = 22%</td>
+            <td>Exact accuracy tied. File search had a better average partial score, but did not win on fully-correct answers.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Where was file search better?</h2>
+      <p>Overall, file search was better because it gained more on BABILong than it lost elsewhere. The clearest wins were short exact-answer cases where the file search found a literal answer form.</p>
+      <table>
+        <thead><tr><th>Task type</th><th>Full context</th><th>File search</th><th>Difference</th><th>Read</th></tr></thead>
+        <tbody>
+          <tr><td>BABILong qa9 — simple negation</td><td>0 / 10</td><td><span class="green">5 / 10</span></td><td>+5 search</td><td>Search helped with yes/no evidence.</td></tr>
+          <tr><td>BABILong qa6 — yes/no</td><td>0 / 10</td><td><span class="green">3 / 10</span></td><td>+3 search</td><td>Search often returned the exact “No” form instead of “No.” formatting mismatch or uncertainty.</td></tr>
+          <tr><td>BABILong qa10 — indefinite knowledge</td><td>0 / 10</td><td><span class="green">2 / 10</span></td><td>+2 search</td><td>Again mostly exact yes/no style recovery.</td></tr>
+          <tr><td>BABILong qa4 — two-argument relation</td><td>0 / 10</td><td><span class="green">1 / 10</span></td><td>+1 search</td><td>Search found the exact location string once.</td></tr>
+          <tr><td>OOLONG multidoc_spells</td><td>13 / 50</td><td><span class="green">15 / 50</span></td><td>+2 search</td><td>Search helped find spell names in some transcript questions.</td></tr>
+        </tbody>
+      </table>
+      <p class="caption">BABILong qa5 was tied at 6 / 10. OOLONG singledoc_spells was tied at 9 / 25. File search was not uniformly better.</p>
+    </section>
+
+    <section>
+      <h2>Where was full context better?</h2>
+      <p>Full context still won some tasks, especially when the task required aggregation or when search picked the wrong local match.</p>
+      <table>
+        <thead><tr><th>Task type</th><th>Full context</th><th>File search</th><th>Difference</th><th>Read</th></tr></thead>
+        <tbody>
+          <tr><td>OOLONG singledoc_rolls</td><td><span class="blue">5 / 25</span></td><td>4 / 25</td><td>+1 full context</td><td>Counting rolls can require broad reading; simple search can miss or overcount.</td></tr>
+          <tr><td>OOLONG multidoc_rolls</td><td><span class="blue">6 / 50</span></td><td>5 / 50</td><td>+1 full context</td><td>Same pattern: aggregation is not just finding one word.</td></tr>
+          <tr><td>BABILong qa8 — list/set</td><td><span class="blue">1 / 10</span></td><td>0 / 10</td><td>+1 full context</td><td>Search picked a wrong object in one case.</td></tr>
+        </tbody>
+      </table>
+      <p class="caption">On OOLONG overall, exact accuracy tied: full context 33 / 150 and file search 33 / 150.</p>
+    </section>
+
+    <section>
+      <h2>Paired result: who beat whom on the same task?</h2>
+      <p>Each of the 250 tasks was run twice: once with full context and once with file search.</p>
+      <div class="grid four">
+        <div class="card"><h3>Both correct</h3><div class="metric green">25</div><p class="muted">Both methods got it right.</p></div>
+        <div class="card"><h3>Full only</h3><div class="metric blue">15</div><p class="muted">Full context got it, search missed it.</p></div>
+        <div class="card"><h3>Search only</h3><div class="metric green">25</div><p class="muted">Search got it, full context missed it.</p></div>
+        <div class="card"><h3>Both wrong</h3><div class="metric red">185</div><p class="muted">Still hard for both methods.</p></div>
+      </div>
+      <table>
+        <thead><tr><th>Paired score winner</th><th>Count</th><th>What it means</th></tr></thead>
+        <tbody>
+          <tr><td>Full context scored higher</td><td><strong>54</strong></td><td>Reading the source directly was better on these.</td></tr>
+          <tr><td>File search scored higher</td><td><strong>59</strong></td><td>Search recovered or approximated the answer better.</td></tr>
+          <tr><td>Tie</td><td><strong>137</strong></td><td>They were equal, often because both were wrong.</td></tr>
+        </tbody>
+      </table>
+      <p class="quote">This is why the honest claim is: <strong>file search slightly beat full context overall, especially on BABILong, but it did not universally dominate.</strong></p>
+      <table>
+        <thead><tr><th>Dataset</th><th>Search-only correct</th><th>Full-only correct</th><th>Both correct</th><th>Both wrong</th></tr></thead>
+        <tbody>
+          <tr><td>BABILong</td><td><span class="green">12</span></td><td>2</td><td>5</td><td>81</td></tr>
+          <tr><td>OOLONG-real</td><td>13</td><td>13</td><td>20</td><td>104</td></tr>
+        </tbody>
+      </table>
+      <p class="caption">Search’s net advantage came almost entirely from BABILong exact-fact tasks. On OOLONG-real, search-only and full-only were exactly tied.</p>
+    </section>
+
+    <section>
+      <h2>What changed from the earlier “agent memory” run?</h2>
+      <div class="split">
+        <div class="card">
+          <h3>Earlier: long agent chat</h3>
+          <p>The source was injected over many chat turns. Old turns could be compressed.</p>
+          <p><strong>100 / 100</strong> completed. <strong>68 / 100</strong> had compression. Accuracy was <strong>21%</strong>.</p>
+          <p class="muted">This tests what happens in a long-running agent session.</p>
+        </div>
+        <div class="card">
+          <h3>Now: clean lossless control</h3>
+          <p>The full-context arm got the source in one prompt. The file-search arm got the same source as a file.</p>
+          <p><strong>500 / 500</strong> completed. <strong>0</strong> compression events. Full context: <strong>16%</strong>. File search: <strong>20%</strong>.</p>
+          <p class="muted">This directly tests the “but full context should work better” objection.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>What should we tell people?</h2>
+      <div class="grid two">
+        <div class="callout">
+          <h3>Safe public claim</h3>
+          <p class="ok">On 500 real-data runs, searchable source files slightly beat a direct full-context prompt overall.</p>
+          <p class="ok">The advantage was concentrated in BABILong exact-fact tasks.</p>
+          <p class="ok">For OOLONG-real aggregation tasks, exact accuracy tied.</p>
+          <p class="ok">This supports keeping original source files accessible to agents instead of relying only on long-context reading.</p>
+        </div>
+        <div class="callout bad">
+          <h3>Do not overclaim</h3>
+          <p class="no">Do not say grep always beats full context.</p>
+          <p class="no">Do not say tools solve all long-context tasks.</p>
+          <p class="no">Do not say full context is useless. It uniquely solved 15 tasks here.</p>
+          <p class="no">Do not mix this with compressed chat-memory results without saying they are different settings.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>One-slide version</h2>
+      <pre>We ran the clean non-compacted control: 250 real long-context tasks, each twice: (1) source directly in the prompt, no tools; (2) same source saved as a file, Codex can search it. This produced 500 Codex runs, no synthetic tasks, no run failures, and 0 compaction events.
+
+Result: file search was slightly better overall: 20% vs 16%. On BABILong exact-fact tasks it was clearly better: 17% vs 7%. On OOLONG-real aggregation tasks, exact accuracy tied at 22%.
+
+Separate earlier result: in a 100-run long-agent-chat baseline, 68/100 runs did compact, with 240 total compaction events and 21% accuracy. That is the compressed-agent-memory setting, not the same as the 500-run clean control.
+
+Verdict: search does not universally beat full context, but it can beat direct long-context reading on exact-fact retrieval. The practical takeaway is to keep original sources searchable for agents; do not rely only on the model remembering or reading a huge prompt.</pre>
+    </section>
+
+    <section>
+      <h2>Artifacts</h2>
+      <table>
+        <tbody>
+          <tr><td>500-run analysis</td><td><code>artifacts/batches/real_lossless_vs_grep_500/20260515-173440/analysis/report.md</code></td></tr>
+          <tr><td>500-run summary JSON</td><td><code>artifacts/batches/real_lossless_vs_grep_500/20260515-173440/analysis/summary.json</code></td></tr>
+          <tr><td>Raw run records</td><td><code>artifacts/batches/real_lossless_vs_grep_500/20260515-173440/runs</code></td></tr>
+          <tr><td>Task panel</td><td><code>data/benchmarks/confirmation/real_lossless_250.jsonl</code></td></tr>
+          <tr><td>Earlier 100-run agent-memory analysis</td><td><code>artifacts/batches/balanced_context_100/20260514-184008/analysis/report.md</code></td></tr>
+        </tbody>
+      </table>
+      <p class="caption">LongMemEval was not included in the 500-run lossless control because the raw trajectories are too large to fit losslessly. Including clipped LME would have made the control dishonest.</p>
+    </section>
+
+    <div class="footer">CompactionBench · Full Context vs File Search · 500 real-data Codex runs · May 2026</div>
+  </main>
+</body>
+</html>

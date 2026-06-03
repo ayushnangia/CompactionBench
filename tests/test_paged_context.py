@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import subprocess
 
-from compactionbench.paged_context import build_paged_prompt, write_paged_memory
+from compactionbench.memory.paged_context import build_paged_prompt, write_paged_memory
 
 
 def test_write_paged_memory_emits_pages_and_tool(tmp_path) -> None:

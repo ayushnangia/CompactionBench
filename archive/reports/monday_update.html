@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint Update — Monday AM</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; padding: 40px 24px; line-height: 1.6; }
+  .container { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 22px; color: #f0f6fc; margin-bottom: 4px; }
+  .date { color: #8b949e; font-size: 13px; margin-bottom: 28px; }
+
+  .section { margin-bottom: 28px; }
+  .section-title { font-size: 15px; color: #58a6ff; margin-bottom: 10px; font-weight: 600; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0; }
+  th { text-align: left; padding: 8px 10px; background: #161b22; color: #8b949e; border-bottom: 1px solid #21262d; }
+  td { padding: 8px 10px; border-bottom: 1px solid #21262d; }
+  .g { color: #3fb950; font-weight: 600; }
+  .r { color: #f85149; font-weight: 600; }
+  .y { color: #d29922; }
+
+  .insight { background: #1a2332; border-left: 3px solid #58a6ff; padding: 12px 16px; border-radius: 0 6px 6px 0; margin: 12px 0; font-size: 13px; }
+  .insight strong { color: #f0f6fc; }
+
+  .todo { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 12px 16px; margin: 6px 0; font-size: 13px; }
+  .todo .check { color: #8b949e; margin-right: 8px; }
+  .todo .done { color: #3fb950; margin-right: 8px; }
+
+  .footer { font-size: 11px; color: #484f58; margin-top: 32px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>CompactionBench — Monday Update</h1>
+<div class="date">Week 1 · Tool-accessible compression</div>
+
+<!-- AM DONE -->
+<div class="section">
+  <div class="section-title">AM — Grep baseline on BABILong</div>
+
+  <table>
+    <tr><th>Experiment</th><th>Result</th></tr>
+    <tr><td>Grep vs raw on qa1-10 (128k)</td><td class="g">Grep 60% beats raw 43%</td></tr>
+    <tr><td>Grep vs raw on qa11-20 (128k)</td><td class="g">Grep 90% beats raw 83%</td></tr>
+    <tr><td>qa1 256k: grep</td><td class="g">Got "bathroom" ✓</td></tr>
+    <tr><td>qa1 256k: raw</td><td class="r">"Not mentioned in context" ✗</td></tr>
+    <tr><td>qa1 512k: grep</td><td class="g">Got "bathroom" ✓</td></tr>
+    <tr><td>qa1 512k: raw</td><td class="r">"Not stated" ✗</td></tr>
+  </table>
+
+  <div class="insight"><strong>Grep beats context injection at all tested lengths.</strong> The model is better at searching a file with a tool than finding the answer in injected context. Keeping original files accessible matters more than perfect compression.</div>
+</div>
+
+<!-- GREP VARIANTS -->
+<div class="section">
+  <div class="section-title">Grep strategy variants (qa1 256k, 512k)</div>
+  <table>
+    <tr><th>Strategy</th><th>256k</th><th>512k</th></tr>
+    <tr><td>Basic grep</td><td class="g">✓</td><td class="g">✓</td></tr>
+    <tr><td>grep -C 5 (context)</td><td class="g">✓</td><td class="g">✓</td></tr>
+    <tr><td>grep -i (case)</td><td class="g">✓</td><td class="g">✓</td></tr>
+    <tr><td>grep -w (word)</td><td class="g">✓</td><td class="g">✓</td></tr>
+    <tr><td>Count first, then search</td><td class="g">✓</td><td class="g">✓</td></tr>
+  </table>
+  <div class="insight"><strong>Strategy doesn't matter for easy tasks.</strong> All five variants got the right answer. The qa1 task is too simple to differentiate strategies.</div>
+</div>
+
+<!-- HINT BACKFIRE -->
+<div class="section">
+  <div class="section-title">Grep-friendly compression hint — backfired</div>
+  <table>
+    <tr><th>Condition</th><th>Answer</th></tr>
+    <tr><td>No hint during compression</td><td class="g">"the bathroom" ✓</td></tr>
+    <tr><td>"Keep grep-friendly terms" hint</td><td class="r">"Not found in the provided chunks" ✗</td></tr>
+  </table>
+  <div class="insight"><strong>The hint made it worse.</strong> Adding text about grep-friendly compression took up space that could have held the answer. The compressor kept the instruction, dropped the content.</div>
+</div>
+
+<!-- CLAUDE VS CODEX -->
+<div class="section">
+  <div class="section-title">Claude greps better than Codex</div>
+  <table>
+    <tr><th>Model</th><th>Grep result</th></tr>
+    <tr><td>Claude Haiku 4.5</td><td class="g">"Bathroom" ✓</td></tr>
+    <tr><td>GPT-5.4-mini</td><td class="r">"house" ✗ (picked wrong Mary mention)</td></tr>
+  </table>
+</div>
+
+<!-- NEXT STEPS -->
+<div class="section">
+  <div class="section-title">PM — Diagnose grep failures</div>
+
+  <div class="todo"><span class="check">☐</span> Check results from 9-condition experiment (running now)</div>
+  <div class="todo"><span class="check">☐</span> Categorize failures: no grep vs wrong grep vs wrong selection</div>
+  <div class="todo"><span class="check">☐</span> Build two-turn experiment: compress grep-friendly, then grep</div>
+  <div class="todo"><span class="check">☐</span> Test on harder tasks (qa2, qa3, qa19 where grep might fail)</div>
+
+  <div class="section-title" style="margin-top:20px;">Tomorrow AM — Compressed ledger</div>
+  <div class="todo"><span class="check">☐</span> Extract entities and locations from BABILong context</div>
+  <div class="todo"><span class="check">☐</span> Build structured JSON ledger format</div>
+  <div class="todo"><span class="check">☐</span> Compare: raw context vs grep vs ledger</div>
+</div>
+
+<div class="footer">CompactionBench · github.com/ayushnangia/CompactionBench · Week 1 Monday</div>
+
+</div>
+</body>
+</html>

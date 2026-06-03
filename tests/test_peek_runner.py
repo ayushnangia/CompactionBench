@@ -4,10 +4,10 @@ import importlib.util
 import sys
 from pathlib import Path
 
-from compactionbench.schema import TaskRow
+from compactionbench.core.schema import TaskRow
 
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "run_peek_codex_sequential.py"
+SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "run" / "run_peek_codex_sequential.py"
 _spec = importlib.util.spec_from_file_location("run_peek_codex_sequential", SCRIPT)
 assert _spec is not None and _spec.loader is not None
 peek_runner = importlib.util.module_from_spec(_spec)

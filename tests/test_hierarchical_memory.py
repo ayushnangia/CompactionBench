@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from compactionbench.hierarchical_memory import (
+from compactionbench.memory.hierarchical_memory import (
     build_flat_memory_packet,
     build_flat_memory_prompt,
     build_hierarchical_memory_packet,
@@ -8,7 +8,7 @@ from compactionbench.hierarchical_memory import (
     parse_memory_events,
     route_question,
 )
-from compactionbench.hierarchical_tasks import generate_hierarchical_memory_tasks
+from compactionbench.taskgen.hierarchical import generate_hierarchical_memory_tasks
 
 
 def _context() -> str:

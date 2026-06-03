@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from compactionbench.run import (
+from compactionbench.runners.run import (
     _load_codex_session_compaction_events,
     parse_claude_stream_json,
     parse_codex_jsonl,
@@ -103,7 +103,7 @@ def test_load_codex_session_compaction_events_prefers_compacted_records(tmp_path
             ]
         )
     )
-    monkeypatch.setattr('compactionbench.run.CODEX_SESSIONS_DIR', tmp_path / '.codex' / 'sessions')
+    monkeypatch.setattr('compactionbench.runners.run.CODEX_SESSIONS_DIR', tmp_path / '.codex' / 'sessions')
     got = _load_codex_session_compaction_events(session_id, condition='auto')
     assert len(got) == 1
     assert got[0].raw['type'] == 'compacted'

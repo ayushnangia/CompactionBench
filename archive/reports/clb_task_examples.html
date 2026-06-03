@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CLB Task Examples — Sales Prediction & Cohort Studies</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; padding: 40px 24px; line-height: 1.6; }
+  .container { max-width: 800px; margin: 0 auto; }
+  h1 { font-size: 22px; color: #f0f6fc; margin-bottom: 4px; }
+  .subtitle { color: #8b949e; font-size: 13px; margin-bottom: 32px; }
+
+  .section { margin-bottom: 36px; background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 24px; }
+  .section-title { font-size: 17px; color: #58a6ff; margin-bottom: 4px; font-weight: 600; }
+  .section-what { font-size: 13px; color: #8b949e; margin-bottom: 16px; }
+
+  .flow { display: flex; align-items: center; gap: 8px; margin: 16px 0; font-size: 12px; }
+  .flow-box { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 8px 12px; text-align: center; }
+  .flow-arrow { color: #484f58; font-size: 14px; }
+
+  .data-box { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 14px; font-family: 'SF Mono', monospace; font-size: 11px; overflow-x: auto; margin: 12px 0; }
+  .data-box .h { color: #58a6ff; }
+  .data-box .v { color: #d29922; }
+  .data-box .g { color: #3fb950; }
+
+  .agent-box { background: #1a2332; border: 1px solid #30363d; border-radius: 6px; padding: 14px; font-size: 12px; margin: 12px 0; }
+  .agent-box .tag { display: inline-block; padding: 2px 6px; border-radius: 8px; font-size: 10px; font-weight: 600; margin-right: 6px; }
+  .tag-blue { background: #1a3a5c; color: #58a6ff; }
+  .tag-green { background: #1a3a1e; color: #3fb950; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 12px 0; }
+  th { text-align: left; padding: 6px 10px; background: #0d1117; color: #8b949e; border-bottom: 1px solid #21262d; }
+  td { padding: 6px 10px; border-bottom: 1px solid #21262d; }
+  .num { text-align: right; font-family: monospace; }
+
+  .insight { background: #1a2332; border-left: 3px solid #58a6ff; padding: 14px 18px; border-radius: 0 6px 6px 0; margin: 16px 0; font-size: 13px; }
+  .insight strong { color: #f0f6fc; }
+
+  .footer { font-size: 11px; color: #484f58; margin-top: 32px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>CLB Task Examples</h1>
+<p class="subtitle">What the agent actually sees and does in sales prediction and cohort studies</p>
+
+<!-- ====== SALES ====== -->
+<div class="section">
+  <div class="section-title">Sales Prediction</div>
+  <div class="section-what">12 episodes. Each episode adds ~794 rows of furniture sales data. The agent must predict next-period sales by writing Python code in a Docker container.</div>
+
+  <div class="flow">
+    <div class="flow-box">Episode N data</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">Agent writes Python</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">Docker runs code</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">Predictions scored</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">Episode N+1 (more data)</div>
+  </div>
+
+  <p style="font-size:12px;color:#8b949e;margin:16px 0 8px 0;">What the agent receives each episode:</p>
+  <div class="data-box">
+<span class="h">DATA ROOM (Episode 3, 2,382 rows accumulated)</span><br><br>
+<span class="h">furniture_id  location    type            price   year   sold</span><br>
+<span class="v">FUR001</span>        San Fran    SECTIONAL_SOFA   6895   2026   <span class="g">105</span><br>
+<span class="v">FUR002</span>        San Fran    DINING_TABLE    3200   2026    <span class="g">22</span><br>
+<span class="v">FUR003</span>        San Fran    OFFICE_DESK     1500   2026    <span class="g">47</span><br>
+<span class="v">FUR001</span>        Austin      SECTIONAL_SOFA   6895   2026    <span class="g">89</span><br>
+<span class="v">FUR004</span>        Austin      BOOKCASE         850   2026    <span class="g">134</span><br>
+...<br><br>
+<span class="h">NEXT PERIOD (no sold column — you must predict):</span><br>
+<span class="v">FUR001</span>        San Fran    SECTIONAL_SOFA   6895   2027   <span class="g">?</span><br>
+<span class="v">FUR005</span>        Portland    SOFA             4200   2027   <span class="g">?</span><br>
+<span class="v">FUR008</span>        Denver      DINING_TABLE    3100   2027   <span class="g">?</span><br>
+  </div>
+
+  <div class="agent-box">
+    <span class="tag tag-blue">Agent action</span> Writes a Python script using pandas + statsmodels to fit a trend per (furniture_type × location) and predict 2027 values.<br><br>
+    <span class="tag tag-green">Docker result</span> Predictions CSV: FUR001,San Fran,98 / FUR005,Portland,34 / FUR008,Denver,19<br><br>
+    <span class="tag tag-blue">Scoring</span> Compares predicted vs actual. Rewards improved accuracy across episodes — the agent should learn which furniture types follow which trends.
+  </div>
+</div>
+
+<!-- ====== COHORT ====== -->
+<div class="section">
+  <div class="section-title">Cohort Studies</div>
+  <div class="section-what">20 instances. Each instance is a SQLite database of patient records. The agent runs SQL queries and survival analysis to find treatment effects.</div>
+
+  <div class="flow">
+    <div class="flow-box">Patient DB (SQLite)</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">Agent writes SQL</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">Tool executes query</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">Results returned</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">Agent reports findings</div>
+  </div>
+
+  <p style="font-size:12px;color:#8b949e;margin:16px 0 8px 0;">What the agent receives:</p>
+  <div class="data-box">
+<span class="h">HERALD Study — Suburban Region — 192 patients</span><br>
+<span class="h">Database: herald_suburban.db</span><br><br>
+<span class="h">Available tables: patients, treatments, outcomes, visits</span><br>
+<span class="h">patient_id  age  sex   treatment_start  treatment  outcome  outcome_time</span><br>
+<span class="v">P001</span>        62   F     2023-01-15       drug_a     alive    730 days<br>
+<span class="v">P002</span>        58   M     2023-02-01       placebo    deceased 180 days<br>
+<span class="v">P003</span>        71   F     2023-01-20       drug_b     alive    540 days<br>
+...<br>
+  </div>
+
+  <div class="agent-box">
+    <span class="tag tag-blue">Agent tools</span> <span style="font-family:monospace;font-size:11px">run_query(sql)</span> · <span style="font-family:monospace;font-size:11px">kaplan_meier(cohort)</span> · <span style="font-family:monospace;font-size:11px">log_rank_test(groups)</span> · <span style="font-family:monospace;font-size:11px">define_cohort(criteria)</span><br><br>
+    <span class="tag tag-green">Typical session</span><br>
+    1. <span style="font-family:monospace;font-size:11px">SELECT COUNT(*), treatment, outcome FROM patients GROUP BY treatment, outcome</span><br>
+    2. "drug_a shows lower mortality. Let me check with Kaplan-Meier."<br>
+    3. <span style="font-family:monospace;font-size:11px">kaplan_meier(cohort=[patients on drug_a])</span> → survival curve<br>
+    4. "3 more instances remain. I should check if drug_b performs similarly in the next study."<br><br>
+    <span class="tag tag-blue">Scoring</span> Agent reports findings for pre-defined cohorts. Evaluated on accuracy of survival group assignments and p-value correctness.
+  </div>
+</div>
+
+<!-- ====== KEY DIFFERENCE ====== -->
+<div class="insight">
+  <strong>Why text-only scoring fails:</strong> In the real CLB benchmark, the agent <strong>writes and runs code</strong> in a Docker container. It iterates — runs SQL, sees results, adjusts. In our text-only CompactionBench version, we strip all of that and ask the model to answer from static context. The model gives a text explanation ("drug_a appears effective") but the gold expects structured output (SQL + p-values + CSV). <strong>Format mismatch, not model failure.</strong>
+</div>
+
+<div class="footer">
+  CompactionBench × Continual Learning Bench · April 2026
+</div>
+
+</div>
+</body>
+</html>

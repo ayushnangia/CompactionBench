@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from compactionbench.paged_context import write_paged_memory
-from compactionbench.virtual_context import (
+from compactionbench.memory.paged_context import write_paged_memory
+from compactionbench.memory.virtual_context import (
     VirtualContextConfig,
     build_virtual_context_packet,
     build_virtual_context_prompt,

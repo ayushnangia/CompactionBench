@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Is Virtual Context Better Than Grep, or a Fluke?</title>
+<style>
+:root{--bg:#0b1020;--panel:#111827;--panel2:#172033;--text:#eef4ff;--muted:#a9b6ca;--line:#2a3852;--blue:#60a5fa;--green:#34d399;--yellow:#fbbf24;--red:#fb7185;--purple:#c084fc}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 8% 0%,rgba(96,165,250,.22),transparent 34rem),radial-gradient(circle at 92% 8%,rgba(192,132,252,.15),transparent 30rem),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.55}.wrap{max-width:1220px;margin:0 auto;padding:42px 22px 80px}header,section{border:1px solid var(--line);background:rgba(17,24,39,.94);border-radius:26px;box-shadow:0 18px 55px rgba(0,0,0,.35);padding:30px;margin-bottom:22px}h1{font-size:clamp(36px,6vw,72px);line-height:1;letter-spacing:-.055em;margin:0 0 14px}h2{font-size:clamp(24px,3vw,38px);line-height:1.1;letter-spacing:-.035em;margin:0 0 16px}h3{font-size:20px;margin:0 0 8px}p{margin:0 0 12px}.big{font-size:20px;color:#dbeafe}.muted{color:var(--muted)}.pillrow{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}.pill{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(11,16,32,.55);color:#dbeafe;font-size:14px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.grid.two{grid-template-columns:repeat(2,1fr)}.card{border:1px solid var(--line);border-radius:20px;background:rgba(23,32,51,.85);padding:20px}.metric{font-size:38px;line-height:1;font-weight:950;letter-spacing:-.05em;margin:8px 0}.green{color:var(--green);font-weight:850}.blue{color:var(--blue);font-weight:850}.yellow{color:var(--yellow);font-weight:850}.red{color:var(--red);font-weight:850}.purple{color:var(--purple);font-weight:850}.callout{border-radius:20px;padding:22px;border:1px solid rgba(52,211,153,.45);background:rgba(52,211,153,.10)}.warn{border-color:rgba(251,191,36,.48);background:rgba(251,191,36,.10)}.bad{border-color:rgba(251,113,133,.48);background:rgba(251,113,133,.10)}table{width:100%;border-collapse:collapse;margin-top:14px;border-radius:16px;overflow:hidden;font-size:15px}th,td{border:1px solid var(--line);padding:12px 14px;text-align:left;vertical-align:top}th{background:#0b1020;color:#e5efff}td{background:rgba(11,16,32,.36)}code,pre{background:#0b1020;border:1px solid var(--line);border-radius:12px}code{padding:2px 5px}pre{padding:16px;white-space:pre-wrap;word-break:break-word;color:#dbeafe}.quote{border-left:4px solid var(--blue);padding-left:16px;color:#dbeafe;font-size:18px;margin:12px 0}.step{display:grid;grid-template-columns:52px 1fr;gap:14px;align-items:start;margin:14px 0}.num{width:44px;height:44px;border-radius:999px;background:rgba(96,165,250,.18);border:1px solid rgba(96,165,250,.55);display:flex;align-items:center;justify-content:center;font-weight:950;color:#bfdbfe}@media(max-width:900px){.grid,.grid.two{grid-template-columns:1fr}header,section{padding:22px}}
+</style></head>
+<body><main class="wrap">
+<header><h1>Is virtual context actually better than grep?</h1><p class="big">A step-by-step walkthrough of what the system does, what evidence we have, where it wins, where it fails, and whether the latest result could be a fluke.</p><div class="pillrow"><span class="pill">fixed BABILong/OOLONG set</span><span class="pill">1500 runs</span><span class="pill">paired comparisons</span><span class="pill">mechanism examples</span><span class="pill">honest caveats</span></div></header>
+
+<section><h2>Bottom line</h2><div class="callout"><p><strong>It is not proven universally better than grep.</strong> But it is not just random noise either.</p><p>The evidence says: <span class="green">system-managed virtual context improves retrieval-heavy BABILong tasks</span> because it extracts the right event trace and avoids carrier-text false matches. <span class="yellow">It does not solve OOLONG</span>, where the missing piece is structured counting/aggregation.</p></div></section>
+
+<section><h2>Step-by-step: what happens in virtual context</h2>
+<div class="step"><div class="num">1</div><div><h3>Start with the same original source</h3><p>For each task, the original <code>task.context</code> is unchanged. No answer key is used.</p></div></div>
+<div class="step"><div class="num">2</div><div><h3>Split it into pages</h3><p>The harness writes overlapping page files and a hidden index.</p><pre>virtual_memory/
+  pages/page_000001.txt
+  pages/page_000002.txt
+  page_index.jsonl
+  manifest.json</pre></div></div>
+<div class="step"><div class="num">3</div><div><h3>Build a hidden page table</h3><p>Each page has an id, file path, line range, token estimate, and preview. The model does not manage this table.</p></div></div>
+<div class="step"><div class="num">4</div><div><h3>System memory kernel retrieves a resident set</h3><p>BABILong uses a concise event extractor. OOLONG uses roll/spell/question-term windows. This happens before the model call.</p></div></div>
+<div class="step"><div class="num">5</div><div><h3>Render the evidence packet</h3><p>The model receives <code>&lt;VIRTUAL_CONTEXT_EVIDENCE&gt;</code>, not a pager tool and not one huge file.</p></div></div>
+<div class="step"><div class="num">6</div><div><h3>Model answers with tools disabled</h3><p>Virtual-context runs used <strong>0 tool calls</strong>. The model just answers from the evidence packet.</p></div></div>
+</section>
+
+<section><h2>Evidence 1: virtual beats grep in the aggregate</h2><table><thead><tr><th>Arm</th><th>Strict score</th><th>Relaxed score</th><th>Tools/run</th></tr></thead><tbody>
+<tr><td>grep_file</td><td>52/250 = 20.8%</td><td>93/250 = 37.2%</td><td>4.32</td></tr>
+<tr><td>virtual_context_8k</td><td>59/250 = 23.6%</td><td><strong>99/250 = 39.6%</strong></td><td>0.00</td></tr>
+<tr><td>virtual_context_24k</td><td><strong>62/250 = 24.8%</strong></td><td>98/250 = 39.2%</td><td>0.00</td></tr>
+<tr><td>virtual_context_48k</td><td>60/250 = 24.0%</td><td>97/250 = 38.8%</td><td>0.00</td></tr>
+</tbody></table><p class="quote">The important part is not just the score. It is that all three system-managed virtual variants beat grep overall while using no model-side search tools.</p></section>
+
+<section><h2>Evidence 2: the gain is consistent across virtual variants</h2><table><thead><tr><th>Virtual arm vs grep</th><th>Strict virtual-only</th><th>Strict grep-only</th><th>Relaxed virtual-only</th><th>Relaxed grep-only</th></tr></thead><tbody>
+<tr><td>virtual_context_8k</td><td>25</td><td>18</td><td>25</td><td>19</td></tr>
+<tr><td>virtual_context_24k</td><td>28</td><td>18</td><td>23</td><td>18</td></tr>
+<tr><td>virtual_context_48k</td><td>26</td><td>18</td><td>21</td><td>17</td></tr>
+</tbody></table><p>If it were pure random noise, we would not expect all three independently-configured virtual arms to point the same direction.</p></section>
+
+<section><h2>Evidence 3: the win is concentrated exactly where the mechanism should help</h2><table><thead><tr><th>Dataset</th><th>Grep</th><th>Best virtual</th><th>Interpretation</th></tr></thead><tbody>
+<tr><td>BABILong strict</td><td>23/100</td><td>34/100</td><td>Virtual context helps because BABI facts can be extracted from noisy carrier text.</td></tr>
+<tr><td>BABILong relaxed</td><td>63/100</td><td>68/100</td><td>Virtual remains ahead after allowing harmless formatting changes.</td></tr>
+<tr><td>OOLONG strict/relaxed</td><td>around 19–20%</td><td>around 19–21%</td><td>No real win. OOLONG needs aggregation, not just retrieval.</td></tr>
+</tbody></table><p class="quote">This pattern is exactly what we would expect if virtual context is improving evidence selection, not magically improving all reasoning.</p></section>
+
+<section><h2>Evidence 4: paired stats say “promising, not definitive”</h2><table><thead><tr><th>Comparison</th><th>Difference</th><th>Sign-test / bootstrap read</th></tr></thead><tbody>
+<tr><td>virtual_24k vs grep, all tasks, strict</td><td>+4 points</td><td>virtual-only 28 vs grep-only 18; two-sided sign p≈0.184. Direction positive but not conclusive.</td></tr>
+<tr><td>virtual_24k vs grep, BABILong, strict</td><td>+11 points</td><td>virtual-only 19 vs grep-only 8; two-sided sign p≈0.052, one-sided p≈0.026. This is the strongest evidence.</td></tr>
+<tr><td>virtual_48k vs grep, BABILong, strict</td><td>+11 points</td><td>virtual-only 20 vs grep-only 9; two-sided sign p≈0.061, one-sided p≈0.031.</td></tr>
+<tr><td>virtual vs grep, OOLONG</td><td>about 0</td><td>No evidence of a meaningful virtual-context advantage.</td></tr>
+</tbody></table><div class="callout warn"><p><strong>Honest interpretation:</strong> the overall win is modest. The BABILong strict win is close to conventional significance and mechanism-consistent. The OOLONG result says retrieval alone is not enough.</p></div></section>
+
+<section><h2>Mechanism walkthrough: where virtual context beat grep</h2><div class="grid two"><div class="card"><h3>Task</h3><p><strong>BABILong qa2</strong></p><p>Question: <code>Where is the football?</code></p><p>Gold: <code>kitchen</code></p><p>Grep answer: <code>with Daniel</code> ❌</p><p>Virtual answer: <code>the kitchen</code> ✅</p></div><div class="card"><h3>Why virtual got it</h3><p>The memory kernel extracted a chronological event trace:</p><pre>[013] Daniel took the football there.
+[017] Daniel dropped the football.
+[019] Daniel grabbed the football there.
+[022] Daniel went to the kitchen.</pre><p>The system did the memory work before the model answered.</p></div></div></section>
+
+<section><h2>Another win: avoiding carrier-text distractors</h2><div class="grid two"><div class="card"><h3>Bad grep-style trap</h3><pre>Mary Linden went to Didlum's shop.</pre><p>This is real text in the carrier novel, but it is not the benchmark Mary.</p></div><div class="card"><h3>Virtual context evidence</h3><pre>[001] John travelled to the hallway.
+[002] Mary journeyed to the bathroom.
+[003] John moved to the bedroom.</pre><p>For <code>Where is Mary?</code>, virtual answered <code>the bathroom</code>.</p></div></div></section>
+
+<section><h2>Where grep still wins</h2><table><thead><tr><th>Example</th><th>Gold</th><th>Grep</th><th>Virtual</th><th>Failure mode</th></tr></thead><tbody>
+<tr><td>BABILong qa4: hallway north of?</td><td>bathroom</td><td>the bathroom</td><td>the office</td><td>Spatial relation inversion/reasoning remains fragile.</td></tr>
+<tr><td>OOLONG: Intimidation count</td><td>1</td><td>1</td><td>0</td><td>Virtual packet did not become a reliable counter.</td></tr>
+<tr><td>OOLONG: most common spell</td><td>Dispel Magic</td><td>Dispel Magic</td><td>scrying</td><td>Needs full frequency table, not retrieved windows.</td></tr>
+</tbody></table></section>
+
+<section><h2>Why this is better than grep when it works</h2><ol>
+<li><strong>It removes memory-management burden from the model.</strong> The model does not choose search strings, inspect pages, or decide when to stop.</li>
+<li><strong>It can structure the source before the model sees it.</strong> For BABILong, it turns noisy text into an event trace.</li>
+<li><strong>It is auditable.</strong> Every virtual run records selected pages, item previews, evidence tokens, and strategy in metadata.</li>
+<li><strong>It uses zero model tools.</strong> That matters for latency/control/reproducibility and for separating retrieval from reasoning.</li>
+<li><strong>It provides a path to stronger systems.</strong> Add page-fault retries and structured operators; grep does not naturally become that.</li>
+</ol></section>
+
+<section><h2>Why it might still be a fluke</h2><div class="callout bad"><p>The total margin over grep is small. On all 250 tasks, relaxed score is only +2 to +2.4 points. Some bootstrap intervals include zero. So we should not claim “virtual context always beats grep.”</p></div><p>What we can say instead:</p><pre>In this fixed BABILong/OOLONG run, transparent virtual context beat grep overall and showed a mechanism-consistent improvement on BABILong. The result is promising but not yet definitive; OOLONG needs structured aggregation.</pre></section>
+
+<section><h2>How to make the evidence stronger next</h2><ol>
+<li><strong>Do not rerun baselines.</strong> Reuse fixed-panel full_context/grep results.</li>
+<li><strong>Run only corrected virtual variants.</strong> Larger sample, same fixed test set.</li>
+<li><strong>Hard enforce evidence budgets.</strong> Current 8k/24k/48k labels were not strict enough.</li>
+<li><strong>Add page-fault loop.</strong> Answer → verify support → retrieve more pages → retry.</li>
+<li><strong>Add OOLONG table operators.</strong> Build roll/spell tables, then count/sort/filter deterministically.</li>
+<li><strong>Report paired tests by dataset.</strong> Especially BABILong, where the mechanism should help.</li>
+</ol></section>
+
+<section><h2>Slack-ready summary</h2><pre>We tested whether virtual context is more than a grep replacement. On the fixed BABILong/OOLONG panel, system-managed virtual context beat grep overall (best strict 24.8% vs 20.8%; best relaxed 39.6% vs 37.2%) while using zero model tools. The win is concentrated on BABILong, where the memory kernel extracts clean event traces and avoids carrier-text false matches. OOLONG is still unsolved because it needs structured counting/aggregation, not just better retrieval. So: promising and mechanism-consistent, but not a universal “grep is beaten” claim yet.</pre></section>
+
+<section><h2>Files</h2><table><tbody><tr><th>This report</th><td><code>docs/virtual_context_fluke_analysis.html</code></td></tr><tr><th>OS-level findings</th><td><code>docs/os_levels_babilong_oolong_findings.html</code></td></tr><tr><th>Rows</th><td><code>artifacts/batches/os_levels_babilong_oolong_1500/20260519-185502/analysis/rows.csv</code></td></tr><tr><th>Summary</th><td><code>artifacts/batches/os_levels_babilong_oolong_1500/20260519-185502/analysis/summary.json</code></td></tr></tbody></table></section>
+</main></body></html>

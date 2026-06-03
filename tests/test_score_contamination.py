@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 
-from compactionbench.schema import AgentAnswer, RunRecord, ToolEvent
-from compactionbench.score import score_runs
+from compactionbench.core.schema import AgentAnswer, RunRecord, ToolEvent
+from compactionbench.core.score import score_runs
 
 
 def test_summary_excludes_contaminated_runs_from_main_accuracy(tmp_path) -> None:

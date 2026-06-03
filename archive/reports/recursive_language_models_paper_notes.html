@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Recursive Language Models — Paper Notes for CompactionBench</title>
+<style>
+:root{--bg:#0b1020;--panel:#111827;--text:#eef4ff;--muted:#a9b6ca;--line:#2a3852;--blue:#60a5fa;--green:#34d399;--yellow:#fbbf24;--red:#fb7185;--purple:#c084fc}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 8% 0%,rgba(96,165,250,.22),transparent 34rem),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.55}.wrap{max-width:1180px;margin:0 auto;padding:42px 22px 80px}header,section{border:1px solid var(--line);background:rgba(17,24,39,.94);border-radius:26px;box-shadow:0 18px 55px rgba(0,0,0,.35);padding:30px;margin-bottom:22px}h1{font-size:clamp(36px,6vw,72px);line-height:1;letter-spacing:-.055em;margin:0 0 14px}h2{font-size:clamp(24px,3vw,38px);line-height:1.1;letter-spacing:-.035em;margin:0 0 16px}h3{font-size:20px;margin:0 0 8px}p{margin:0 0 12px}.big{font-size:20px;color:#dbeafe}.muted{color:var(--muted)}.pillrow{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}.pill{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(11,16,32,.55);color:#dbeafe;font-size:14px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}.card{border:1px solid var(--line);border-radius:20px;background:rgba(23,32,51,.85);padding:20px}.callout{border-radius:20px;padding:22px;border:1px solid rgba(52,211,153,.45);background:rgba(52,211,153,.10)}.warn{border-color:rgba(251,191,36,.48);background:rgba(251,191,36,.10)}table{width:100%;border-collapse:collapse;margin-top:14px;border-radius:16px;overflow:hidden;font-size:15px}th,td{border:1px solid var(--line);padding:12px 14px;text-align:left;vertical-align:top}th{background:#0b1020;color:#e5efff}td{background:rgba(11,16,32,.36)}code,pre{background:#0b1020;border:1px solid var(--line);border-radius:12px}code{padding:2px 5px}pre{padding:16px;white-space:pre-wrap;word-break:break-word;color:#dbeafe}.green{color:var(--green);font-weight:850}.yellow{color:var(--yellow);font-weight:850}.red{color:var(--red);font-weight:850}.quote{border-left:4px solid var(--blue);padding-left:16px;color:#dbeafe;font-size:18px;margin:12px 0}@media(max-width:900px){.grid{grid-template-columns:1fr}header,section{padding:22px}}
+</style></head><body><main class="wrap">
+<header><h1>Recursive Language Models</h1><p class="big">Notes on arXiv:2512.24601 and what it means for our virtual-context work.</p><div class="pillrow"><span class="pill">paper: 2512.24601</span><span class="pill">Alex L. Zhang, Tim Kraska, Omar Khattab</span><span class="pill">MIT CSAIL</span><span class="pill">RLM ≠ relevance model</span></div></header>
+
+<section><h2>Correction</h2><div class="callout"><p>I initially interpreted “RLM” as a retrieval relevance language model / RM3. That was wrong for this paper.</p><p>Here, <strong>RLM = Recursive Language Model</strong>: an inference-time scaffold where the prompt is stored as an external object in a REPL, and the model writes code to inspect, transform, and recursively call LMs/RLMs on slices of the prompt.</p></div></section>
+
+<section><h2>Paper in one paragraph</h2><p>The paper argues that arbitrarily long prompts should not be directly stuffed into the neural model context. Instead, the prompt should live in an external environment. The root model receives metadata and a symbolic handle to the prompt, writes code in a REPL to inspect/decompose it, stores intermediate results in variables, and can call sub-LMs or sub-RLMs over programmatically chosen chunks. This can do dense semantic work over inputs far beyond the base context window.</p></section>
+
+<section><h2>Core algorithm</h2><pre>state = InitREPL(prompt=P)
+state = AddFunction(state, sub_RLM_M)
+hist = [Metadata(state)]
+
+while True:
+    code = LLM_M(hist)
+    state, stdout = REPL(state, code)
+    hist = hist + code + Metadata(stdout)   # stdout is summarized/truncated
+    if state[Final] is set:
+        return state[Final]</pre><p class="muted">Key: the prompt and intermediate values live in the REPL state, not in the model history.</p></section>
+
+<section><h2>The three design choices that matter</h2><table><thead><tr><th>Design choice</th><th>Meaning</th><th>Why it matters</th></tr></thead><tbody>
+<tr><td>Symbolic handle to prompt</td><td>The prompt is stored as <code>context</code> in the environment.</td><td>The root model does not need the entire prompt in context.</td></tr>
+<tr><td>Intermediate state outside model context</td><td>Large buffers, extracted tables, chunk results live in variables.</td><td>Avoids compaction and context pollution.</td></tr>
+<tr><td>Programmatic recursion</td><td>Code can call <code>llm_query</code> or <code>rlm_query</code> inside loops.</td><td>Allows O(n) or O(n²) semantic work over prompt chunks.</td></tr>
+</tbody></table></section>
+
+<section><h2>How this differs from our current virtual context</h2><table><thead><tr><th>Our virtual context</th><th>RLM paper</th></tr></thead><tbody>
+<tr><td>System retrieves evidence before the model call.</td><td>Model writes code to inspect/decompose the source during inference.</td></tr>
+<tr><td>Model sees an evidence packet only.</td><td>Model sees a REPL interface and can manipulate a <code>context</code> variable.</td></tr>
+<tr><td>Currently one-shot: no retry/page fault.</td><td>Iterative loop until <code>Final</code> is set.</td></tr>
+<tr><td>Typed extractors help BABILong.</td><td>Sub-LM calls help semantic/dense tasks like OOLONG.</td></tr>
+<tr><td>More system-managed / OS-kernel-like.</td><td>More programmatic / recursive-agent-like.</td></tr>
+</tbody></table></section>
+
+<section><h2>Where RLM fits in our memory ladder</h2><table><thead><tr><th>Level</th><th>Method</th><th>Who manages memory?</th></tr></thead><tbody>
+<tr><td>0</td><td>full_context</td><td>No memory system; prompt stuffing.</td></tr>
+<tr><td>1</td><td>grep_file</td><td>Model uses shell search over a file.</td></tr>
+<tr><td>2</td><td>paged_context</td><td>Model manually loads pages.</td></tr>
+<tr><td>3</td><td>virtual_context</td><td>System preloads resident evidence.</td></tr>
+<tr><td>4</td><td><strong>RLM-depth0</strong></td><td>Model writes code over external prompt variable, no subcalls.</td></tr>
+<tr><td>5</td><td><strong>RLM-depth1</strong></td><td>Model writes code and programmatically calls sub-LMs over chunks.</td></tr>
+<tr><td>6</td><td><strong>RLM + virtual context</strong></td><td>System provides typed memory APIs; RLM plans/decomposes and calls submodels.</td></tr>
+</tbody></table></section>
+
+<section><h2>Why this matters for us</h2><div class="grid"><div class="card"><h3>For BABILong</h3><p>Our virtual context already works because event extraction is easy. RLM may not add much unless we use it to derive state with code.</p></div><div class="card"><h3>For OOLONG</h3><p>RLM is directly relevant: OOLONG needs semantic labeling over many lines and aggregation. The paper says recursive sub-calls help exactly here.</p></div></div></section>
+
+<section><h2>Correct RLM-based experiment to try</h2><div class="callout warn"><p>Do <strong>not</strong> use RM3/query expansion. That was the wrong interpretation.</p><p>Correct new arms:</p><pre>rlm_repl_depth0     # context in REPL/file variable; model writes code; no sub-LM calls
+rlm_repl_depth1     # same, but code can call llm_query(chunk_prompt) on chunks
+rlm_virtual_hybrid  # RLM REPL plus our typed virtual-memory APIs</pre></div></section>
+
+<section><h2>Practical implementation sketch</h2><pre>Workspace:
+  context.txt                # full source, outside prompt
+  rlm_env.py                 # helper functions
+  task.json                  # question, metadata
+
+Prompt:
+  You are in an RLM-style REPL.
+  The full context is available at ./context.txt.
+  Write Python to inspect/decompose it.
+  Store intermediate results in variables/files.
+  Return final JSON answer.
+
+Depth 0:
+  model writes Python, regex, parsing, counting
+
+Depth 1:
+  provide llm_query(prompt) helper
+  model can call sub-LLM on chunks and aggregate results
+</pre></section>
+
+<section><h2>What to run first</h2><ol><li><strong>Stop using RLM/RM3 terminology</strong> for the query-expansion arm.</li><li><strong>Implement <code>rlm_repl_depth0</code></strong> first. This is cheaper and close to paper's depth=0 ablation.</li><li><strong>Run only new arms</strong> on fixed BABILong/OOLONG; reuse baselines.</li><li><strong>Then implement depth=1</strong> with a controlled <code>llm_query</code> helper for OOLONG chunks.</li><li><strong>Compare against our virtual context</strong>: system-managed prefetch vs model-programmed recursion.</li></ol></section>
+
+<section><h2>Paper claims relevant to our writing</h2><ul><li>Compaction assumes early details can be safely forgotten; this fails on dense tasks.</li><li>Effective context window depends on task complexity.</li><li>Needle tasks are O(1); OOLONG is linear; OOLONG-Pairs is quadratic.</li><li>REPL is necessary for handling long inputs; recursive sub-calls help information-dense tasks.</li><li>Training models on RLM trajectories can improve downstream RLM behavior.</li></ul></section>
+
+<section><h2>Files downloaded/read</h2><table><tbody><tr><th>arXiv HTML</th><td><code>artifacts/papers/2512.24601/abs.html</code></td></tr><tr><th>PDF</th><td><code>artifacts/papers/2512.24601/paper.pdf</code></td></tr><tr><th>Text extraction</th><td><code>artifacts/papers/2512.24601/paper.txt</code></td></tr><tr><th>Source</th><td><code>artifacts/papers/2512.24601/source/</code></td></tr></tbody></table></section>
+</main></body></html>

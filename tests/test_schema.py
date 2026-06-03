@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from compactionbench.schema import AgentAnswer, RunRecord, TaskRow, parse_agent_answer
+from compactionbench.core.schema import AgentAnswer, RunRecord, TaskRow, parse_agent_answer
 
 
 def _valid_task_row() -> dict:

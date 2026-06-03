@@ -1,0 +1,4 @@
+{
+  "q-static": ["traj-static"],
+  "q-dynamic": ["traj-dynamic"]
+}

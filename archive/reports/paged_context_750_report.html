@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Paged context experiment: 750 real-data runs</title>
+<style>
+:root{--bg:#0b1020;--panel:#121a2b;--panel2:#172238;--text:#eef4ff;--muted:#aab8ce;--line:#2a3956;--green:#34d399;--blue:#60a5fa;--yellow:#fbbf24;--red:#fb7185;}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 10% 0%,rgba(96,165,250,.22),transparent 35rem),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.55}.wrap{max-width:1160px;margin:0 auto;padding:42px 22px 80px}header,section{border:1px solid var(--line);background:rgba(18,26,43,.94);border-radius:24px;padding:28px;margin:0 0 20px;box-shadow:0 20px 60px rgba(0,0,0,.32)}h1{font-size:clamp(34px,6vw,68px);line-height:1;letter-spacing:-.055em;margin:0 0 14px}h2{font-size:clamp(24px,3vw,38px);letter-spacing:-.035em;line-height:1.1;margin:0 0 14px}h3{margin:0 0 8px}p{margin:0 0 12px}.big{font-size:20px;color:#dbeafe}.muted{color:var(--muted)}.pillrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.pill{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:#0b1020;color:#dbeafe;font-size:14px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.grid.two{grid-template-columns:repeat(2,1fr)}.card{border:1px solid var(--line);border-radius:18px;background:rgba(23,34,56,.85);padding:18px}.metric{font-size:38px;font-weight:950;letter-spacing:-.05em;line-height:1;margin:8px 0}table{width:100%;border-collapse:collapse;margin-top:12px;border-radius:14px;overflow:hidden}th,td{border:1px solid var(--line);padding:11px 13px;text-align:left;vertical-align:top}th{background:#0b1020}td{background:rgba(11,16,32,.36)}code,pre{background:#0b1020;border:1px solid var(--line);border-radius:12px}code{padding:2px 5px}pre{padding:14px;white-space:pre-wrap;word-break:break-word}.green{color:var(--green);font-weight:850}.blue{color:var(--blue);font-weight:850}.yellow{color:var(--yellow);font-weight:850}.red{color:var(--red);font-weight:850}.callout{border:1px solid rgba(52,211,153,.45);background:rgba(52,211,153,.10);border-radius:18px;padding:18px}@media(max-width:850px){.grid,.grid.two{grid-template-columns:1fr}}
+</style>
+</head>
+<body><main class="wrap">
+<header>
+<h1>Paged context experiment: 750 real-data runs</h1>
+<p class="big">This report compares three ways for an agent to use a long source: direct full context, one searchable file, and paged external memory.</p>
+<div class="pillrow"><span class="pill">batch: artifacts/batches/real_paged_context_750/20260519-145809</span><span class="pill">runs: 750</span><span class="pill">strict + relaxed scoring</span><span class="pill">real BABILong + OOLONG</span></div>
+</header>
+
+<section>
+<h2>What we are testing</h2>
+<div class="grid">
+<div class="card"><h3>Full context</h3><p>The whole source is pasted into the prompt. No search tools.</p></div>
+<div class="card"><h3>File search</h3><p>The source is saved as <code>full_context.txt</code>. The agent can grep/search it.</p></div>
+<div class="card"><h3>Paged context</h3><p>The source is split into page files. The agent searches a page table and loads pages as needed, like infinite context with paging.</p></div>
+</div>
+</section>
+
+<section>
+<h2>Top-line results</h2>
+<div class="grid">
+<div class="card"><h3>full_context</h3><div class="metric">40/250</div><p>strict: <span class="blue">16.0%</span></p><p>relaxed: <span class="green">92/250 (36.8%)</span></p><p class="muted">tools/run 0.00; duration 16.7s</p></div>
+<div class="card"><h3>grep_file</h3><div class="metric">57/250</div><p>strict: <span class="blue">22.8%</span></p><p>relaxed: <span class="green">97/250 (38.8%)</span></p><p class="muted">tools/run 4.66; duration 29.9s</p></div>
+<div class="card"><h3>paged_context</h3><div class="metric">42/250</div><p>strict: <span class="blue">16.8%</span></p><p>relaxed: <span class="green">84/250 (33.6%)</span></p><p class="muted">tools/run 5.02; duration 32.2s</p></div>
+</div>
+<p class="muted">Strict score uses the original benchmark scorer. Relaxed score also accepts harmless formatting changes such as <code>the bathroom</code> vs <code>bathroom</code>.</p>
+</section>
+
+<section>
+<h2>Pairwise against full context</h2>
+<table><thead><tr><th>Comparison</th><th>Pairs</th><th>Full wins</th><th>Other wins</th><th>Ties</th><th>Only other correct</th></tr></thead><tbody>
+<tr><td>full_context vs grep_file</td><td>250</td><td>42</td><td>76</td><td>132</td><td>29</td></tr>
+<tr><td>full_context vs paged_context</td><td>250</td><td>53</td><td>53</td><td>144</td><td>16</td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>Breakdown by dataset</h2>
+<table><thead><tr><th>Arm</th><th>Dataset</th><th>Strict</th><th>Relaxed</th><th>Parse OK</th></tr></thead><tbody>
+<tr><td>full_context</td><td>babilong</td><td>7/100 (7.0%)</td><td>57/100 (57.0%)</td><td>100/100</td></tr>
+<tr><td>full_context</td><td>oolong</td><td>33/150 (22.0%)</td><td>35/150 (23.3%)</td><td>150/150</td></tr>
+<tr><td>grep_file</td><td>babilong</td><td>25/100 (25.0%)</td><td>62/100 (62.0%)</td><td>100/100</td></tr>
+<tr><td>grep_file</td><td>oolong</td><td>32/150 (21.3%)</td><td>35/150 (23.3%)</td><td>150/150</td></tr>
+<tr><td>paged_context</td><td>babilong</td><td>11/100 (11.0%)</td><td>53/100 (53.0%)</td><td>100/100</td></tr>
+<tr><td>paged_context</td><td>oolong</td><td>31/150 (20.7%)</td><td>31/150 (20.7%)</td><td>150/150</td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>Interesting examples</h2>
+<h3>Pager-only relaxed wins</h3>
+<table><thead><tr><th>Task</th><th>Dataset</th><th>Gold</th><th>Paged answer</th><th>Full answer</th><th>Grep answer</th></tr></thead><tbody>
+<tr><td>babilong-qa4-128k-0</td><td>babilong/qa4</td><td>bedroom</td><td>the bedroom</td><td>the hallway</td><td>the hallway</td></tr>
+<tr><td>babilong-qa4-128k-4</td><td>babilong/qa4</td><td>garden</td><td>the garden</td><td>the kitchen</td><td>kitchen</td></tr>
+<tr><td>oolong-real-multidoc_rolls-2ep-78e88234-41f3-a0c6-db30-1cc9e20170e6</td><td>oolong/multidoc_rolls</td><td>5</td><td>5</td><td>\boxed{3}</td><td>2</td></tr>
+<tr><td>oolong-real-multidoc_rolls-3ep-f685e3ac-1ad7-5bc2-4d72-bcabd4c8bbc6</td><td>oolong/multidoc_rolls</td><td>39</td><td>39</td><td>\boxed{20}</td><td>34</td></tr>
+</tbody></table>
+<h3>Full-context wins over pager</h3>
+<table><thead><tr><th>Task</th><th>Dataset</th><th>Gold</th><th>Paged answer</th><th>Full answer</th><th>Grep answer</th></tr></thead><tbody>
+<tr><td>babilong-qa1-128k-1</td><td>babilong/qa1</td><td>kitchen</td><td>the bathroom</td><td>Sandra moved to the kitchen.</td><td>the kitchen</td></tr>
+<tr><td>babilong-qa1-128k-7</td><td>babilong/qa1</td><td>bathroom</td><td>to the office</td><td>Sandra travelled to the bathroom.</td><td>the bathroom</td></tr>
+<tr><td>babilong-qa10-128k-4</td><td>babilong/qa10</td><td>yes</td><td>No.</td><td>Yes.</td><td>Yes.</td></tr>
+<tr><td>babilong-qa2-128k-1</td><td>babilong/qa2</td><td>garden</td><td>down</td><td>in the garden</td><td>where Sandra put it down</td></tr>
+</tbody></table>
+<h3>Strict marked wrong but relaxed accepts</h3>
+<table><thead><tr><th>Task</th><th>Dataset</th><th>Gold</th><th>Paged answer</th><th>Full answer</th><th>Grep answer</th></tr></thead><tbody>
+<tr><td>babilong-qa1-128k-0</td><td>babilong/qa1</td><td>bathroom</td><td>In the bathroom.</td><td>Mary journeyed to the bathroom.</td><td>bathroom</td></tr>
+<tr><td>babilong-qa1-128k-2</td><td>babilong/qa1</td><td>kitchen</td><td>the kitchen</td><td>the kitchen</td><td>the kitchen</td></tr>
+<tr><td>babilong-qa1-128k-3</td><td>babilong/qa1</td><td>kitchen</td><td>the kitchen</td><td>to the kitchen</td><td>the kitchen</td></tr>
+<tr><td>babilong-qa1-128k-4</td><td>babilong/qa1</td><td>bedroom</td><td>the bedroom</td><td>the bedroom</td><td>the bedroom</td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>How to read this</h2>
+<div class="callout"><p><strong>Good result for paging:</strong> paged context should match or beat file search on exact lookup, while doing better on broad reading/counting because pages preserve nearby context.</p><p><strong>Bad result for paging:</strong> if it searches the wrong pages, it can confidently answer from irrelevant evidence. The examples above are the most useful part for improving the pager.</p></div>
+</section>
+
+</main></body></html>

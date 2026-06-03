@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Virtual Context Memory — ICLR Research Plan</title>
+<style>
+:root{--bg:#0b1020;--panel:#111827;--panel2:#172033;--text:#eef4ff;--muted:#a9b6ca;--line:#2a3852;--blue:#60a5fa;--green:#34d399;--yellow:#fbbf24;--red:#fb7185;--purple:#c084fc}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 8% 0%,rgba(96,165,250,.22),transparent 34rem),radial-gradient(circle at 92% 8%,rgba(192,132,252,.15),transparent 30rem),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.55}.wrap{max-width:1240px;margin:0 auto;padding:42px 22px 80px}header,section{border:1px solid var(--line);background:rgba(17,24,39,.94);border-radius:26px;box-shadow:0 18px 55px rgba(0,0,0,.35);padding:30px;margin-bottom:22px}h1{font-size:clamp(36px,6vw,72px);line-height:1;letter-spacing:-.055em;margin:0 0 14px}h2{font-size:clamp(24px,3vw,38px);line-height:1.1;letter-spacing:-.035em;margin:0 0 16px}h3{font-size:20px;margin:0 0 8px}p{margin:0 0 12px}.big{font-size:20px;color:#dbeafe}.muted{color:var(--muted)}.pillrow{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}.pill{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(11,16,32,.55);color:#dbeafe;font-size:14px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.grid.two{grid-template-columns:repeat(2,1fr)}.card{border:1px solid var(--line);border-radius:20px;background:rgba(23,32,51,.85);padding:20px}.green{color:var(--green);font-weight:850}.blue{color:var(--blue);font-weight:850}.yellow{color:var(--yellow);font-weight:850}.red{color:var(--red);font-weight:850}.purple{color:var(--purple);font-weight:850}.callout{border-radius:20px;padding:22px;border:1px solid rgba(52,211,153,.45);background:rgba(52,211,153,.10)}.warn{border-color:rgba(251,191,36,.48);background:rgba(251,191,36,.10)}.bad{border-color:rgba(251,113,133,.48);background:rgba(251,113,133,.10)}table{width:100%;border-collapse:collapse;margin-top:14px;border-radius:16px;overflow:hidden;font-size:15px}th,td{border:1px solid var(--line);padding:12px 14px;text-align:left;vertical-align:top}th{background:#0b1020;color:#e5efff}td{background:rgba(11,16,32,.36)}code,pre{background:#0b1020;border:1px solid var(--line);border-radius:12px}code{padding:2px 5px}pre{padding:16px;white-space:pre-wrap;word-break:break-word;color:#dbeafe}.quote{border-left:4px solid var(--blue);padding-left:16px;color:#dbeafe;font-size:18px;margin:12px 0}.diagram{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}.level{border:1px solid var(--line);border-radius:16px;background:#0b1020;padding:14px;min-height:148px}.level strong{display:block;color:white;margin-bottom:8px}.small{font-size:13px}@media(max-width:1000px){.grid,.grid.two,.diagram{grid-template-columns:1fr}header,section{padding:22px}}
+</style></head>
+<body><main class="wrap">
+<header><h1>Virtual Context Memory as an ICLR paper</h1><p class="big">A research framing, literature positioning, claims to make, claims to avoid, and the experiment plan needed to make this submission-grade.</p><div class="pillrow"><span class="pill">memory hierarchy for agents</span><span class="pill">system-managed retrieval</span><span class="pill">fixed real-data panels</span><span class="pill">paired statistics</span><span class="pill">ICLR-style contribution</span></div></header>
+
+<section><h2>Proposed paper title</h2><div class="callout"><p class="big"><strong>Virtual Context Memory: System-Managed Evidence Paging for Long-Context Agents</strong></p><p>Alternative shorter title: <strong>Who Should Manage Context? System vs. Model Memory Management in Long-Context Agents</strong></p></div></section>
+
+<section><h2>Core thesis</h2><p class="quote">Long-context agents should not rely on the model to remember or search everything. Like an operating system, the agent runtime should manage a memory hierarchy: original sources live outside the model, a memory kernel retrieves a resident evidence set, and the model answers from that evidence.</p><div class="grid two"><div class="card"><h3>What this is not</h3><p>Not “grep always beats full context.”</p><p>Not “we solved infinite context.”</p><p>Not “RAG with a new name.”</p></div><div class="card"><h3>What this is</h3><p>A controlled study of <strong>who manages memory</strong>: the model, tools, or the system.</p><p>A first implementation of <strong>transparent resident-set retrieval</strong>.</p></div></div></section>
+
+<section><h2>Research question hierarchy</h2><table><thead><tr><th>RQ</th><th>Question</th><th>Current evidence</th><th>Needed for ICLR</th></tr></thead><tbody>
+<tr><td>RQ1</td><td>Does system-managed memory beat model-managed search?</td><td>Virtual context beats grep overall in 1500-run BABILong/OOLONG experiment, with strongest effect on BABILong.</td><td>Repeat on more models and no baseline re-runs; add confidence intervals and ablations.</td></tr>
+<tr><td>RQ2</td><td>Which task types benefit?</td><td>BABILong exact event/state tasks benefit. OOLONG aggregation does not.</td><td>Formal task taxonomy: lookup, state tracking, spatial, transfer, counting, first/last, frequency.</td></tr>
+<tr><td>RQ3</td><td>Is manual paging worse than transparent paging?</td><td>Manual <code>paged_context</code> underperforms grep; transparent virtual context beats both overall.</td><td>Show model-visible paging imposes cognitive/tool burden via tool counts, latency, and error analysis.</td></tr>
+<tr><td>RQ4</td><td>Does resident-set budget matter?</td><td>8k/24k/48k are similar, but budgets were not strictly enforced.</td><td>Fix hard budgets and sweep 2k/4k/8k/16k/32k with exact token caps.</td></tr>
+<tr><td>RQ5</td><td>Can page-fault retries close remaining failures?</td><td>Not implemented yet.</td><td>Add verifier: unsupported answer → retrieve more evidence → retry.</td></tr>
+<tr><td>RQ6</td><td>Can structured memory operators solve aggregation?</td><td>OOLONG remains hard for all retrieval methods.</td><td>Add roll/spell table extractors and deterministic count/sort/filter operators.</td></tr>
+</tbody></table></section>
+
+<section><h2>Method taxonomy: the memory ladder</h2><div class="diagram">
+<div class="level"><strong>Level 0<br/>Full context</strong><span>Everything in prompt. No explicit memory system.</span></div>
+<div class="level"><strong>Level 1<br/>File search</strong><span>Model searches one monolithic file with grep/tools.</span></div>
+<div class="level"><strong>Level 2<br/>Manual paging</strong><span>Model sees page table and decides which pages to load.</span></div>
+<div class="level"><strong>Level 3<br/>Virtual context</strong><span>System retrieves resident evidence before model call.</span></div>
+<div class="level"><strong>Level 4<br/>Faulted context</strong><span>Verifier detects missing evidence and triggers retrieval retry.</span></div>
+<div class="level"><strong>Level 5<br/>Structured memory</strong><span>Typed pages + table/count operators for aggregation.</span></div>
+</div></section>
+
+<section><h2>Related work map</h2><p class="muted">Live paper search was blocked in this environment, so citation details should be verified before submission. This map gives the intended positioning.</p><table><thead><tr><th>Area</th><th>Representative papers</th><th>How we differ</th></tr></thead><tbody>
+<tr><td>Retrieval-Augmented Generation</td><td>RAG; REALM; FiD; Atlas</td><td>We evaluate memory-management responsibility in agents, not just retrieve-doc QA.</td></tr>
+<tr><td>Retrieval-enhanced LMs</td><td>RETRO; kNN-LM; Memorizing Transformers</td><td>Those retrieve at token/model scale; we retrieve task evidence from an agent source memory.</td></tr>
+<tr><td>Tool-use agents</td><td>ReAct; Toolformer; WebGPT-style tool use</td><td>Those put retrieval decisions in the model loop. Our virtual context moves decisions into the runtime.</td></tr>
+<tr><td>Agent memory systems</td><td>MemGPT and long-term memory agents</td><td>Closest conceptual neighbor. We contribute controlled benchmark evidence comparing manual vs transparent memory.</td></tr>
+<tr><td>Long-context failure studies</td><td>Lost in the Middle; long-context benchmark work such as LongBench/RULER/BABILong/LongMemEval</td><td>We use those failure modes to motivate system memory rather than simply longer prompts.</td></tr>
+<tr><td>Self-correcting retrieval</td><td>Self-RAG, CRAG, active retrieval / FLARE-like systems</td><td>These motivate the next page-fault/verifier version.</td></tr>
+</tbody></table></section>
+
+<section><h2>Current empirical story</h2><table><thead><tr><th>Finding</th><th>Evidence</th><th>How to phrase it</th></tr></thead><tbody>
+<tr><td>Virtual context beats grep overall in latest fixed-panel run.</td><td>Best virtual strict 24.8% vs grep 20.8%; best virtual relaxed 39.6% vs grep 37.2%.</td><td>Promising; do not overclaim universal superiority.</td></tr>
+<tr><td>Effect is strongest on BABILong.</td><td>BABILong strict: virtual 31–34/100 vs grep 23/100; relaxed 68/100 vs 63/100.</td><td>Mechanism-consistent improvement on exact state/event retrieval.</td></tr>
+<tr><td>Manual paging is bad.</td><td><code>paged_context</code> underperforms grep and virtual context.</td><td>Model-managed memory creates tool/retrieval burden.</td></tr>
+<tr><td>OOLONG remains unsolved.</td><td>All methods around 19–21% relaxed.</td><td>Retrieval is not enough for aggregation; need structured operators.</td></tr>
+</tbody></table></section>
+
+<section><h2>Why reviewers might reject it</h2><div class="grid two"><div class="card"><h3>Weakness 1: “This is just RAG.”</h3><p>Answer: position the contribution as <strong>memory-management responsibility</strong> and controlled comparisons across full context, grep, manual paging, and transparent memory.</p></div><div class="card"><h3>Weakness 2: “Small effect / possible fluke.”</h3><p>Answer: add repeated runs, models, paired bootstrap CIs, and larger fixed panels. Report where effect does and does not hold.</p></div><div class="card"><h3>Weakness 3: “Task-specific heuristics.”</h3><p>Answer: own it as typed memory pages; then ablate generic retrieval vs typed extractors. For ICLR, show both general and typed versions.</p></div><div class="card"><h3>Weakness 4: “No real page faults.”</h3><p>Answer: implement Level 4: verifier-triggered retrieval retry. Current is Level 3 transparent resident-set retrieval.</p></div></div></section>
+
+<section><h2>ICLR-grade experiment plan</h2><ol>
+<li><strong>Freeze panels and reuse baselines.</strong> No more baseline reruns unless task/model/protocol changes.</li>
+<li><strong>Run new arms only:</strong> hard-budget virtual context, faulted virtual context, structured virtual context.</li>
+<li><strong>Add models:</strong> at least two closed models and one open model if possible.</li>
+<li><strong>Add stochastic repeats:</strong> pass@2 or 3 independent completions on a subset to estimate variance.</li>
+<li><strong>Do paired stats:</strong> McNemar/sign tests, bootstrap CIs, effect sizes, by-dataset and by-task-type.</li>
+<li><strong>Do ablations:</strong> no task hint, generic retrieval only, typed extractor only, no neighbor pages, budget sweep.</li>
+<li><strong>Do failure taxonomy:</strong> wrong page, missing page, stale state, relation inversion, aggregation failure, formatting-only miss.</li>
+<li><strong>Release artifacts:</strong> task panels, run records, selected evidence packets, analysis notebooks/scripts.</li>
+</ol></section>
+
+<section><h2>Proposed paper outline</h2><pre>1. Introduction
+   - Long-context agents need memory management, not just bigger prompts.
+   - Analogy: OS virtual memory.
+
+2. Problem setup
+   - Source memory, question, model context budget.
+   - Memory-management responsibility axis.
+
+3. Methods
+   - Full context, file search, manual paging, virtual context.
+   - Virtual Context Memory implementation.
+
+4. Benchmarks
+   - BABILong, OOLONG-real, SWE-chat, LongMemEval rendered.
+   - Explain scoring and caveats.
+
+5. Experiments
+   - Fixed panels, paired comparisons, budgets, ablations.
+
+6. Results
+   - System-managed memory helps exact retrieval.
+   - Manual paging is worse than grep.
+   - Aggregation requires structured memory.
+
+7. Analysis
+   - Evidence packet audits.
+   - Failure taxonomy.
+   - Statistical significance.
+
+8. Related work
+   - RAG, tool use, memory agents, long context.
+
+9. Limitations
+   - Task-specific extractors, no full page faults yet, model coverage.
+
+10. Conclusion
+   - Memory should be a runtime/system layer.</pre></section>
+
+<section><h2>Next implementation milestones</h2><table><thead><tr><th>Milestone</th><th>Why it matters</th><th>Run policy</th></tr></thead><tbody>
+<tr><td>Hard budget virtual context</td><td>Makes 8k/24k/48k claims real.</td><td>Run only new virtual arms; merge baselines.</td></tr>
+<tr><td>Faulted virtual context</td><td>Makes OS analogy much stronger.</td><td>Run on fixed BABILong/OOLONG panel.</td></tr>
+<tr><td>Structured OOLONG memory</td><td>Tests whether aggregation failures are due to missing operators.</td><td>Run only OOLONG new arms first.</td></tr>
+<tr><td>SWE/LME virtual context</td><td>Generalizes beyond BABILong/OOLONG.</td><td>Use semantic/judge scoring for SWE; label LME rendered.</td></tr>
+</tbody></table></section>
+
+<section><h2>Claim discipline</h2><div class="callout warn"><p><strong>Safe claim:</strong> “System-managed virtual context shows a mechanism-consistent advantage over model-managed search on exact memory retrieval, while aggregation still requires structured operators.”</p><p><strong>Unsafe claim:</strong> “Virtual context beats grep” without task/dataset caveats.</p></div></section>
+
+<section><h2>Files to share internally</h2><table><tbody><tr><th>Plain virtual-context explainer</th><td><code>docs/virtual_context_explainer.html</code></td></tr><tr><th>Design + literature</th><td><code>docs/virtual_context_design_and_literature.html</code></td></tr><tr><th>Fluke analysis</th><td><code>docs/virtual_context_fluke_analysis.html</code></td></tr><tr><th>OS-level results</th><td><code>docs/os_levels_babilong_oolong_findings.html</code></td></tr></tbody></table></section>
+</main></body></html>

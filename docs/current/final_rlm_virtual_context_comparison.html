@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Long-context memory comparison: RLM, search + notes, grep, and full context</title>
+<style>
+:root{--bg:#08111f;--panel:#111c2e;--panel2:#17263d;--text:#eef6ff;--muted:#aebbd0;--line:#2b3d5a;--blue:#60a5fa;--green:#34d399;--yellow:#fbbf24;--red:#fb7185;--purple:#c084fc;--cyan:#22d3ee}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 10% 0%,rgba(96,165,250,.20),transparent 32rem),radial-gradient(circle at 90% 10%,rgba(192,132,252,.18),transparent 30rem),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.55}.wrap{max-width:1220px;margin:0 auto;padding:42px 22px 86px}header,section{border:1px solid var(--line);background:rgba(17,28,46,.94);border-radius:26px;padding:28px;margin:0 0 20px;box-shadow:0 20px 60px rgba(0,0,0,.32)}h1{font-size:clamp(34px,6vw,70px);line-height:1;letter-spacing:-.055em;margin:0 0 14px}h2{font-size:clamp(24px,3vw,38px);line-height:1.1;letter-spacing:-.035em;margin:0 0 14px}h3{margin:0 0 8px}p{margin:0 0 12px}.big{font-size:20px;color:#dbeafe}.muted{color:var(--muted)}.pillrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.pill{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:#0b1020;color:#dbeafe;font-size:14px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.grid.two{grid-template-columns:repeat(2,1fr)}.grid.four{grid-template-columns:repeat(4,1fr)}.card{border:1px solid var(--line);border-radius:18px;background:rgba(23,38,61,.86);padding:18px}.metric{font-size:38px;font-weight:950;letter-spacing:-.05em;line-height:1;margin:8px 0}.smallmetric{font-size:24px;font-weight:900}table{width:100%;border-collapse:collapse;margin-top:12px;border-radius:14px;overflow:hidden;font-size:15px}th,td{border:1px solid var(--line);padding:11px 13px;text-align:left;vertical-align:top}th{background:#0b1020}td{background:rgba(11,16,32,.38)}code,pre{background:#0b1020;border:1px solid var(--line);border-radius:8px}code{padding:2px 5px}pre{padding:14px;white-space:pre-wrap;word-break:break-word;color:#e8f1ff}.green{color:var(--green);font-weight:850}.blue{color:var(--blue);font-weight:850}.yellow{color:var(--yellow);font-weight:850}.red{color:var(--red);font-weight:850}.purple{color:var(--purple);font-weight:850}.cyan{color:var(--cyan);font-weight:850}.callout{border:1px solid rgba(96,165,250,.45);background:rgba(96,165,250,.10);border-radius:18px;padding:18px}.good{border-color:rgba(52,211,153,.55);background:rgba(52,211,153,.10)}.warn{border-color:rgba(251,191,36,.55);background:rgba(251,191,36,.10)}.bad{border-color:rgba(251,113,133,.55);background:rgba(251,113,133,.10)}.tag{display:inline-block;padding:3px 8px;border-radius:999px;border:1px solid var(--line);background:#0b1020;color:#dbeafe;font-size:12px;margin:0 4px 4px 0}.rank{font-weight:900;color:#e8f1ff}@media(max-width:950px){.grid,.grid.two,.grid.four{grid-template-columns:1fr}table{font-size:14px}}
+</style>
+</head>
+<body><main class="wrap">
+<header>
+<h1>Long-context memory comparison</h1>
+<p class="big">One final plain-English report comparing the older baselines, search + notes / virtual context, RLM depth-0, and full recursive RLM depth-1.</p>
+<div class="pillrow">
+<span class="pill">fixed real panel: 250 tasks</span>
+<span class="pill">100 BABILong + 150 OOLONG-real</span>
+<span class="pill">all runs below are without compaction</span>
+<span class="pill">no baseline reruns</span>
+</div>
+</header>
+
+<section>
+<h2>Short answer</h2>
+<div class="grid">
+<div class="card good"><h3>Best exact / strict score</h3><div class="metric green">RLM depth-0</div><p><strong>74/250</strong>. It helped most on exact BABILong lookups by letting the model write code over an external source.</p></div>
+<div class="card good"><h3>Best relaxed score</h3><div class="metric green">Search + notes</div><p><strong>99/250</strong> for the 8k variant. This is the simple name for the older <code>virtual_context</code> arm.</p></div>
+<div class="card bad"><h3>Big surprise</h3><div class="metric red">Depth-1 lost</div><p>Full recursive RLM depth-1 was implemented and verified, but it was slower and less accurate: <strong>47/250</strong>.</p></div>
+</div>
+</section>
+
+<section>
+<h2>Names in this report</h2>
+<table><thead><tr><th>Simple name</th><th>Code name</th><th>What it means</th></tr></thead><tbody>
+<tr><td><strong>Full context</strong></td><td><code>full_context</code></td><td>The whole source is pasted directly into the prompt. No tools.</td></tr>
+<tr><td><strong>File grep</strong></td><td><code>grep_file</code></td><td>The source is saved as one file. The model may use shell search tools like grep/python.</td></tr>
+<tr><td><strong>Model picks pages</strong></td><td><code>paged_context</code></td><td>The source is split into pages. The model has to choose which pages to open and read.</td></tr>
+<tr><td><strong>Search + notes</strong></td><td><code>virtual_context_8k/24k/48k</code></td><td>Previously called virtual context. A helper does a grep-like search first, copies the useful lines into short notes, and gives those notes to the model. The model itself uses <strong>0 tools</strong>.</td></tr>
+<tr><td><strong>RLM depth-0</strong></td><td><code>rlm_repl_depth0</code></td><td>Official Recursive Language Model scaffold. The source lives outside the prompt in a REPL; the model writes Python over it. No child model calls.</td></tr>
+<tr><td><strong>RLM depth-1 recursive</strong></td><td><code>rlm_repl_depth1_recursive</code></td><td>Same RLM scaffold, but every task had at least one child RLM call. Verified: 250/250 tasks used child calls, 658 total child RLM calls.</td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>The two page methods, explained like a normal person</h2>
+<div class="grid two">
+<div class="card"><h3>Model picks pages</h3><p>Imagine a huge book split into many smaller page files.</p><ol><li>The model gets a page list.</li><li>The model chooses which pages to open.</li><li>The model reads those pages.</li><li>Then it answers.</li></ol><p><strong>Problem:</strong> even when the setup is proper, the model can choose the wrong pages. If it opens the wrong pages, it misses the answer.</p></div>
+<div class="card good"><h3>Search + notes</h3><p>This is the easy name for <code>virtual_context</code>. Think of it as <strong>grep + note-taking</strong>.</p><ol><li>A helper does grep-like searching across many pieces of the source.</li><li>The helper pulls out the useful lines.</li><li>The helper turns those lines into short notes.</li><li>The model only reads those notes and answers.</li></ol><p><strong>So it is basically:</strong> grep + note-taking + handing the model only the notes. The model itself does not use tools.</p></div>
+</div>
+</section>
+
+<section>
+<h2>Main results</h2>
+<p class="muted">Strict = exact benchmark scorer. Relaxed = allows harmless formatting differences like “the bathroom” vs “bathroom”.</p>
+<table><thead><tr><th>Approach</th><th>Strict correct</th><th>Relaxed correct</th><th>Tools/run</th><th>Avg time</th><th>What to remember</th></tr></thead><tbody>
+<tr><td>Full context<br><code>full_context</code></td><td>36/250</td><td>89/250</td><td>0.00</td><td>15.9s</td><td>Good control, but weak exact extraction on this panel.</td></tr>
+<tr><td>File grep<br><code>grep_file</code></td><td>52/250</td><td>93/250</td><td>4.32</td><td>26.1s</td><td>Strong simple baseline; not magic, just effective search.</td></tr>
+<tr><td>Model picks pages<br><code>paged_context</code></td><td>37/250</td><td>87/250</td><td>5.30</td><td>29.8s</td><td>Letting the model pick pages was not enough.</td></tr>
+<tr><td>Search + notes 8k<br><code>virtual_context_8k</code></td><td>59/250</td><td><span class="green">99/250</span></td><td>0.00</td><td><span class="green">12.8s</span></td><td>Best relaxed score and fastest strong arm.</td></tr>
+<tr><td>Search + notes 24k<br><code>virtual_context_24k</code></td><td>62/250</td><td>98/250</td><td>0.00</td><td>12.9s</td><td>Best non-RLM strict score.</td></tr>
+<tr><td>Search + notes 48k<br><code>virtual_context_48k</code></td><td>60/250</td><td>97/250</td><td>0.00</td><td>13.9s</td><td>More notes did not clearly help.</td></tr>
+<tr><td>RLM depth-0<br><code>rlm_repl_depth0</code></td><td><span class="green">74/250</span></td><td>83/250</td><td>0.89</td><td>86.6s</td><td>Best strict score; strong on exact BABILong retrieval.</td></tr>
+<tr><td>RLM depth-1 recursive<br><code>rlm_repl_depth1_recursive</code></td><td>47/250</td><td>66/250</td><td>0.82</td><td><span class="red">220.0s</span></td><td>Verified recursion, but slower and worse.</td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>Dataset split: where each approach worked</h2>
+<table><thead><tr><th>Approach</th><th>BABILong strict / relaxed</th><th>OOLONG strict / relaxed</th><th>Pattern</th></tr></thead><tbody>
+<tr><td>Full context</td><td>6/100 / 58/100</td><td>30/150 / 31/150</td><td>Can read OOLONG somewhat, but exact BABILong answers often fail strict format/state tracking.</td></tr>
+<tr><td>File grep</td><td>23/100 / 63/100</td><td>29/150 / 30/150</td><td>Search helps exact lookup, but OOLONG still needs careful counting, not just search.</td></tr>
+<tr><td>Model picks pages</td><td>7/100 / 55/100</td><td>30/150 / 32/150</td><td>Letting the model pick pages added complexity without improving retrieval.</td></tr>
+<tr><td>Search + notes 8k</td><td>31/100 / <span class="green">68/100</span></td><td>28/150 / 31/150</td><td>Great relaxed BABILong score; still weak when OOLONG asks for careful counting.</td></tr>
+<tr><td>Search + notes 24k</td><td>34/100 / <span class="green">68/100</span></td><td>28/150 / 30/150</td><td>Best non-RLM strict BABILong, but not enough for OOLONG.</td></tr>
+<tr><td>RLM depth-0</td><td><span class="green">51/100</span> / 60/100</td><td>23/150 / 23/150</td><td>Best exact BABILong. OOLONG remains hard.</td></tr>
+<tr><td>RLM depth-1 recursive</td><td>39/100 / 55/100</td><td><span class="red">8/150</span> / 11/150</td><td>Recursive child calls hurt more than helped, especially on OOLONG.</td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>How each approach works and how it fails</h2>
+<div class="grid two">
+<div class="card"><h3>Full context</h3><p><span class="tag">works by</span> putting everything in the prompt.</p><p><span class="tag">works when</span> the answer is obvious and the model remembers the right details.</p><p><span class="tag">fails when</span> the source is noisy. BABILong has carrier prose with misleading names like Mary in unrelated stories.</p></div>
+<div class="card"><h3>File grep</h3><p><span class="tag">works by</span> letting the agent search one file.</p><p><span class="tag">works when</span> the answer has good keywords or exact phrases.</p><p><span class="tag">fails when</span> the task asks for counting, first/last events, percentages, or combining facts across episodes.</p></div>
+<div class="card"><h3>Model picks pages</h3><p><span class="tag">works by</span> giving the model page tools and a page table.</p><p><span class="tag">works when</span> the model chooses the right pages.</p><p><span class="tag">fails when</span> the model searches the wrong pages or spends effort managing memory instead of answering.</p></div>
+<div class="card"><h3>Search + notes / virtual context</h3><p><span class="tag">works by</span> doing a grep-like search first, then making short notes for the model.</p><p><span class="tag">works when</span> the useful lines are enough to answer, especially BABILong facts.</p><p><span class="tag">fails when</span> the model still has to count or combine many events, especially OOLONG rolls and spells.</p></div>
+<div class="card"><h3>RLM depth-0</h3><p><span class="tag">works by</span> storing the source outside the prompt and letting the model write Python over it.</p><p><span class="tag">works when</span> code search can find short, clear facts.</p><p><span class="tag">fails when</span> the task needs judgment about what counts as a real D&amp;D roll or spell event.</p></div>
+<div class="card"><h3>RLM depth-1 recursive</h3><p><span class="tag">works by</span> adding child RLM calls over pieces.</p><p><span class="tag">worked technically</span> 250/250 tasks used child RLM calls after reruns.</p><p><span class="tag">failed empirically</span> child RLMs often counted mentions rather than benchmark events, and runtime exploded.</p></div>
+</div>
+</section>
+
+<section>
+<h2>RLM head-to-head</h2>
+<table><thead><tr><th>Comparison</th><th>First only correct</th><th>Second only correct</th><th>Both correct</th><th>Both wrong</th><th>Meaning</th></tr></thead><tbody>
+<tr><td>Depth-1 recursive vs depth-0</td><td>11</td><td><span class="green">38</span></td><td>36</td><td>165</td><td>Depth-0 was better. Recursion added noise/cost.</td></tr>
+<tr><td>Depth-0 vs file grep</td><td><span class="green">38</span></td><td>16</td><td>36</td><td>160</td><td>Depth-0 won more exact tasks than grep, mainly BABILong.</td></tr>
+<tr><td>Depth-0 vs search + notes 8k</td><td><span class="green">37</span></td><td>22</td><td>37</td><td>154</td><td>Depth-0 had more strict-only wins, while search + notes had better relaxed score.</td></tr>
+<tr><td>Depth-1 recursive vs search + notes 8k</td><td>17</td><td><span class="green">29</span></td><td>30</td><td>174</td><td>Search + notes beat recursive depth-1 and was much faster.</td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>What not to overclaim</h2>
+<div class="callout warn"><p><strong>Do not say “grep beats full context” as a universal claim.</strong> This benchmark shows that, on these fixed long real tasks and this model/settings, file search and search + notes often beat direct prompt stuffing.</p><p><strong>Do not say recursive RLMs failed in general.</strong> What failed here was this specific depth-1 setup on BABILong/OOLONG. The RLM machinery worked; the child calls just did not learn what counts as a roll or spell in OOLONG.</p><p><strong>Do not say search + notes is literally grep.</strong> It is grep-like search plus note-taking. The model itself uses zero tools.</p></div>
+</section>
+
+<section>
+<h2>Final takeaway</h2>
+<div class="callout good"><p><strong>Best current recipe:</strong> use RLM depth-0 for exact external-memory code search, and use search + notes when you want fast, tool-free notes.</p><p><strong>Next research step:</strong> OOLONG needs a dedicated roll/spell counter. Generic child RLM calls are not enough.</p></div>
+</section>
+
+<section>
+<h2>Shareable message draft</h2>
+<pre>I finished the combined long-context memory report on the fixed real BABILong/OOLONG panel. Everything in this comparison is without compaction.
+
+The main arms are: full context, file grep, model picks pages, search + notes (formerly virtual context), RLM depth-0, and full recursive RLM depth-1.
+
+Search + notes means the helper program searches pieces first and gives the model short notes. It is like automatic multi-file grep, but the model itself uses 0 tools.
+
+Results: RLM depth-0 had the best strict exact score, 74/250, mostly because it helped BABILong exact lookup. Search + notes had the best relaxed score, 99/250, and was much faster. Full recursive RLM depth-1 was implemented and verified with child RLM calls on every task, but it underperformed: 47/250 and about 220 seconds per task.
+
+Takeaway: external code-over-context is useful for exact memory retrieval. Generic recursive child calls did not solve OOLONG counting. For OOLONG, the next step is a dedicated roll/spell counter, not just more recursion.</pre>
+</section>
+
+<section>
+<h2>Artifacts</h2>
+<table><tbody>
+<tr><th>Final report</th><td><code>docs/final_rlm_virtual_context_comparison.html</code></td></tr>
+<tr><th>RLM depth-0 run</th><td><code>artifacts/batches/rlm_repl_depth0_babilong_oolong_250/20260519-212114</code></td></tr>
+<tr><th>RLM depth-1 recursive run</th><td><code>artifacts/batches/rlm_repl_depth1_recursive_babilong_oolong_250/20260520-013636</code></td></tr>
+<tr><th>Depth-1 compliance rerun</th><td><code>artifacts/batches/rlm_repl_depth1_recursive_babilong_oolong_250/20260520-013636_rerun_nochild</code></td></tr>
+<tr><th>Merged analysis</th><td><code>artifacts/analysis/rlm_depth1_recursive_merged_os_levels</code></td></tr>
+<tr><th>Runner</th><td><code>scripts/run/run_rlm_codex_parallel.py</code></td></tr>
+</tbody></table>
+</section>
+</main></body></html>

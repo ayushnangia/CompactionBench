@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>What happened in the OS-level memory experiment</title>
+<style>
+:root{--bg:#0b1020;--panel:#111827;--panel2:#172033;--text:#eef4ff;--muted:#a9b6ca;--line:#2a3852;--blue:#60a5fa;--green:#34d399;--yellow:#fbbf24;--red:#fb7185;--purple:#c084fc}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 10% 0%,rgba(96,165,250,.22),transparent 35rem),radial-gradient(circle at 90% 10%,rgba(192,132,252,.15),transparent 30rem),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.55}.wrap{max-width:1180px;margin:0 auto;padding:42px 22px 80px}header,section{border:1px solid var(--line);background:rgba(17,24,39,.94);border-radius:26px;box-shadow:0 18px 55px rgba(0,0,0,.35);padding:30px;margin-bottom:22px}h1{font-size:clamp(36px,6vw,72px);line-height:1;letter-spacing:-.055em;margin:0 0 14px}h2{font-size:clamp(24px,3vw,38px);line-height:1.1;letter-spacing:-.035em;margin:0 0 16px}h3{font-size:20px;margin:0 0 8px}p{margin:0 0 12px}.big{font-size:20px;color:#dbeafe}.muted{color:var(--muted)}.pillrow{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}.pill{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(11,16,32,.55);color:#dbeafe;font-size:14px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.grid.two{grid-template-columns:repeat(2,1fr)}.card{border:1px solid var(--line);border-radius:20px;background:rgba(23,32,51,.85);padding:20px}.metric{font-size:40px;line-height:1;font-weight:950;letter-spacing:-.05em;margin:8px 0}table{width:100%;border-collapse:collapse;margin-top:14px;border-radius:16px;overflow:hidden;font-size:15px}th,td{border:1px solid var(--line);padding:12px 14px;text-align:left;vertical-align:top}th{background:#0b1020;color:#e5efff}td{background:rgba(11,16,32,.36)}code,pre{background:#0b1020;border:1px solid var(--line);border-radius:12px}code{padding:2px 5px}pre{padding:14px;white-space:pre-wrap;word-break:break-word}.green{color:var(--green);font-weight:850}.blue{color:var(--blue);font-weight:850}.yellow{color:var(--yellow);font-weight:850}.red{color:var(--red);font-weight:850}.purple{color:var(--purple);font-weight:850}.callout{border-radius:20px;padding:22px;border:1px solid rgba(52,211,153,.45);background:rgba(52,211,153,.10)}.warn{border-color:rgba(251,191,36,.48);background:rgba(251,191,36,.10)}.bad{border-color:rgba(251,113,133,.48);background:rgba(251,113,133,.10)}.quote{border-left:4px solid var(--blue);padding-left:16px;color:#dbeafe;font-size:18px;margin:12px 0}@media(max-width:900px){.grid,.grid.two{grid-template-columns:1fr}header,section{padding:22px}}
+</style></head><body><main class="wrap">
+<header><h1>What happened in the OS-level memory experiment?</h1><p class="big">1500 real runs on the fixed BABILong/OOLONG panel. The short version: system-managed virtual context beat manual paging and grep overall, mostly by cleaning up BABILong retrieval. OOLONG still needs real aggregation operators.</p><div class="pillrow"><span class="pill">250 fixed tasks</span><span class="pill">6 arms</span><span class="pill">1500 runs</span><span class="pill">0 failures</span><span class="pill">BABILong + OOLONG-real</span></div></header>
+
+<section><h2>Top-line result</h2><table><thead><tr><th>Arm</th><th>Strict</th><th>Relaxed</th><th>Tools/run</th><th>Plain English</th></tr></thead><tbody>
+<tr><td>full_context</td><td>36/250 = 14.4%</td><td>89/250 = 35.6%</td><td>0.00</td><td>Direct giant prompt baseline.</td></tr>
+<tr><td>grep_file</td><td>52/250 = 20.8%</td><td>93/250 = 37.2%</td><td>4.32</td><td>Strong baseline: model searches one full file.</td></tr>
+<tr><td>paged_context</td><td>37/250 = 14.8%</td><td>87/250 = 34.8%</td><td>5.30</td><td>Manual paging burden hurts; model has to search/load pages itself.</td></tr>
+<tr><td>virtual_context_8k</td><td>59/250 = 23.6%</td><td><strong>99/250 = 39.6%</strong></td><td>0.00</td><td>Best relaxed score; system-managed evidence, no model tools.</td></tr>
+<tr><td>virtual_context_24k</td><td><strong>62/250 = 24.8%</strong></td><td>98/250 = 39.2%</td><td>0.00</td><td>Best strict score.</td></tr>
+<tr><td>virtual_context_48k</td><td>60/250 = 24.0%</td><td>97/250 = 38.8%</td><td>0.00</td><td>Bigger resident set did not clearly help.</td></tr>
+</tbody></table></section>
+
+<section><h2>The main mechanism</h2><div class="grid two"><div class="callout"><h3>Why virtual context helps</h3><p>For BABILong, the system extracts a clean event trace like <code>Mary journeyed to the bathroom</code> and ignores unrelated carrier prose like <code>Mary Linden went to Didlum's shop</code>.</p><p>The model no longer has to decide which page to search or which page to trust.</p></div><div class="callout warn"><h3>Why it does not solve everything</h3><p>OOLONG is not just retrieval. It often requires counting, percentages, first/last spell lists, or aggregation across episodes.</p><p>Virtual context retrieves evidence, but it does not yet run a deterministic map-reduce/counting operator.</p></div></div></section>
+
+<section><h2>By dataset</h2><table><thead><tr><th>Dataset</th><th>Best result</th><th>What happened</th></tr></thead><tbody>
+<tr><td>BABILong</td><td>virtual_context_24k/48k strict 34/100; all virtual variants relaxed 68/100</td><td>Big win from structured event extraction. Virtual context beats grep relaxed 68/100 vs 63/100 and strict 31–34/100 vs 23/100.</td></tr>
+<tr><td>OOLONG-real</td><td>rough tie around 20–21% relaxed</td><td>No arm really wins. Retrieval alone is not enough for counting/aggregation over D&D transcripts.</td></tr>
+</tbody></table></section>
+
+<section><h2>What changed by task type?</h2><table><thead><tr><th>Task type</th><th>Observation</th></tr></thead><tbody>
+<tr><td>BABILong qa1/qa2/qa3/qa8</td><td>Virtual context helps because it extracts movement/object facts from the noisy carrier text.</td></tr>
+<tr><td>BABILong qa4/qa5/qa6</td><td>Virtual context is strong but grep is already good; these are exact relation/transfer/state questions.</td></tr>
+<tr><td>BABILong qa7</td><td>Everyone is 0/10. The current extractor/scorer path is not handling this task type yet.</td></tr>
+<tr><td>BABILong qa9/qa10</td><td>Virtual context sometimes loses yes/no questions because the trace misses the needed full state or the model answers with explanation that relaxed scoring may not accept.</td></tr>
+<tr><td>OOLONG rolls</td><td>Mostly hard for everyone. Needs a counting engine, not just retrieval windows.</td></tr>
+<tr><td>OOLONG spells</td><td>Moderate success. Retrieval can find spell names, but first/last/per-character across episodes still needs structured extraction.</td></tr>
+</tbody></table></section>
+
+<section><h2>Virtual context vs grep</h2><table><thead><tr><th>Comparison</th><th>Relaxed paired result</th></tr></thead><tbody>
+<tr><td>virtual_context_8k vs grep</td><td>virtual-only 25, grep-only 19, both 74, neither 132</td></tr>
+<tr><td>virtual_context_24k vs grep</td><td>virtual-only 23, grep-only 18, both 75, neither 134</td></tr>
+<tr><td>virtual_context_48k vs grep</td><td>virtual-only 21, grep-only 17, both 76, neither 136</td></tr>
+</tbody></table><p class="quote">Virtual context is not just matching grep. It wins some tasks grep misses, especially BABILong object/location state questions.</p></section>
+
+<section><h2>Examples: virtual context helped</h2><table><thead><tr><th>Task</th><th>Gold</th><th>Grep</th><th>Virtual 24k</th><th>Why</th></tr></thead><tbody>
+<tr><td>BABILong qa2: Where is the football?</td><td>kitchen</td><td>with Daniel</td><td>the kitchen</td><td>System event trace follows object movement instead of carrier prose.</td></tr>
+<tr><td>BABILong qa2: Where is the milk?</td><td>garden</td><td>At Bellevue, across the river</td><td>garden</td><td>Grep grabbed novel text; virtual trace kept BABI facts.</td></tr>
+<tr><td>OOLONG rolls: most common roll type</td><td>Attack</td><td>check</td><td>attack</td><td>Wide evidence packet exposed repeated attack rolls.</td></tr>
+<tr><td>OOLONG spells: last Keyleth spell each episode</td><td>Cure Wounds, Transport Via Plants</td><td>Cure Wounds, Plant Growth</td><td>Cure Wounds, Transport Via Plants</td><td>Virtual packet happened to include the right late-episode spell evidence.</td></tr>
+</tbody></table></section>
+
+<section><h2>Examples: virtual context still failed</h2><table><thead><tr><th>Task</th><th>Gold</th><th>Grep</th><th>Virtual 24k</th><th>Why</th></tr></thead><tbody>
+<tr><td>BABILong qa1: Where is Mary?</td><td>kitchen</td><td>the kitchen</td><td>unknown</td><td>Extractor missed the relevant Mary movement event.</td></tr>
+<tr><td>BABILong qa4: What is hallway north of?</td><td>bathroom</td><td>the bathroom</td><td>the office</td><td>Spatial relation inversion/reasoning still fragile.</td></tr>
+<tr><td>OOLONG rolls: Intimidation count</td><td>1</td><td>1</td><td>0</td><td>Retrieval window did not become a reliable counter.</td></tr>
+<tr><td>OOLONG spells: most common spell</td><td>Dispel Magic</td><td>Dispel Magic</td><td>scrying</td><td>Needs full spell frequency table, not sampled windows.</td></tr>
+</tbody></table></section>
+
+<section><h2>Important caveat about the 8k/24k/48k labels</h2><div class="callout warn"><p>The budget labels are best understood as <strong>resident-set targets</strong>, not perfectly enforced hard caps in this run. Large structured evidence items could exceed the nominal budget, especially for OOLONG event windows.</p><p>Observed average evidence tokens: virtual_8k ≈ 14k, virtual_24k ≈ 14.4k, virtual_48k ≈ 28.7k. This should be tightened before the next budget-sensitivity run.</p></div></section>
+
+<section><h2>What to build next</h2><ol><li><strong>Do not re-run baselines.</strong> Reuse fixed-panel full_context/grep results unless model/prompt/task set changes.</li><li><strong>Fix hard budget enforcement</strong> for virtual-context packets.</li><li><strong>Add page-fault retry:</strong> answer → verifier checks support → kernel loads more pages → retry.</li><li><strong>Add structured OOLONG operators:</strong> roll table extractor, spell table extractor, count/first/last/percentage functions.</li><li><strong>Run only new corrected virtual arms</strong> and merge with existing baselines offline.</li></ol></section>
+
+<section><h2>Slack-ready summary</h2><pre>Ran an OS-level memory ladder on the fixed BABILong/OOLONG panel: 250 tasks × 6 arms = 1500 runs.
+Best overall: transparent virtual context. It beat grep overall while using 0 tools: virtual_8k relaxed 39.6%, virtual_24k strict 24.8%, grep relaxed 37.2% / strict 20.8%.
+Why: virtual context system-loads a clean evidence packet before the model answers. This helps BABILong by extracting concise event facts and avoiding carrier-novel false matches.
+Limit: OOLONG is still hard because it needs real aggregation/counting, not just retrieval. Next step: add verifier-driven page faults and structured roll/spell table operators.</pre></section>
+
+<section><h2>Files</h2><table><tbody><tr><th>Main report</th><td><code>docs/os_levels_babilong_oolong_report.html</code></td></tr><tr><th>This findings report</th><td><code>docs/os_levels_babilong_oolong_findings.html</code></td></tr><tr><th>Batch root</th><td><code>artifacts/batches/os_levels_babilong_oolong_1500/20260519-185502</code></td></tr><tr><th>Rows</th><td><code>artifacts/batches/os_levels_babilong_oolong_1500/20260519-185502/analysis/rows.csv</code></td></tr></tbody></table></section>
+</main></body></html>

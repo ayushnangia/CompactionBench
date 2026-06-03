@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SWE-chat + LongMemEval rendered report</title>
+<style>
+:root{--bg:#0b1020;--panel:#111827;--panel2:#172033;--text:#eef4ff;--muted:#a9b6ca;--line:#2a3852;--blue:#60a5fa;--green:#34d399;--yellow:#fbbf24;--red:#fb7185;--purple:#c084fc;}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 10% 0%,rgba(96,165,250,.22),transparent 35rem),radial-gradient(circle at 90% 10%,rgba(192,132,252,.16),transparent 30rem),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.55}.wrap{max-width:1180px;margin:0 auto;padding:42px 22px 80px}header,section{border:1px solid var(--line);background:rgba(17,24,39,.94);border-radius:26px;box-shadow:0 18px 55px rgba(0,0,0,.35);padding:30px;margin-bottom:22px}h1{font-size:clamp(36px,6vw,72px);line-height:1;letter-spacing:-.055em;margin:0 0 14px}h2{font-size:clamp(24px,3vw,38px);line-height:1.1;letter-spacing:-.035em;margin:0 0 16px}h3{font-size:20px;margin:0 0 8px}p{margin:0 0 12px}.big{font-size:20px;color:#dbeafe}.muted{color:var(--muted)}.pillrow{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}.pill{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:rgba(11,16,32,.55);color:#dbeafe;font-size:14px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.grid.two{grid-template-columns:repeat(2,1fr)}.card{border:1px solid var(--line);border-radius:20px;background:rgba(23,32,51,.85);padding:20px}.metric{font-size:40px;line-height:1;font-weight:950;letter-spacing:-.05em;margin:8px 0}table{width:100%;border-collapse:collapse;margin-top:14px;border-radius:16px;overflow:hidden;font-size:15px}th,td{border:1px solid var(--line);padding:12px 14px;text-align:left;vertical-align:top}th{background:#0b1020;color:#e5efff}td{background:rgba(11,16,32,.36)}code,pre{background:#0b1020;border:1px solid var(--line);border-radius:12px}code{padding:2px 5px}pre{padding:14px;white-space:pre-wrap;word-break:break-word}.green{color:var(--green);font-weight:850}.blue{color:var(--blue);font-weight:850}.yellow{color:var(--yellow);font-weight:850}.red{color:var(--red);font-weight:850}.purple{color:var(--purple);font-weight:850}.callout{border-radius:20px;padding:22px;border:1px solid rgba(52,211,153,.45);background:rgba(52,211,153,.10)}.warn{border-color:rgba(251,191,36,.48);background:rgba(251,191,36,.10)}.bad{border-color:rgba(251,113,133,.48);background:rgba(251,113,133,.10)}.quote{border-left:4px solid var(--blue);padding-left:16px;color:#dbeafe;font-size:18px;margin:12px 0}@media(max-width:900px){.grid,.grid.two{grid-template-columns:1fr}header,section{padding:22px}}
+</style></head><body><main class="wrap">
+<header>
+<h1>SWE-chat + LongMemEval rendered</h1>
+<p class="big">250 real-data runs comparing direct full context against file search on coding-agent chats and rendered web-agent memory.</p>
+<div class="pillrow"><span class="pill">125 tasks × 2 arms</span><span class="pill">50 SWE-chat tasks</span><span class="pill">75 LongMemEval rendered tasks</span><span class="pill">0 failures</span><span class="pill">not pass@2</span></div>
+</header>
+
+<section><h2>One-sentence read</h2>
+<div class="callout"><p><strong>LongMemEval rendered:</strong> file search did a little better than direct full context.</p><p><strong>SWE-chat:</strong> exact scoring is the wrong metric; rough semantic overlap actually favors full context, but this needs an LLM judge before making a strong claim.</p></div>
+</section>
+
+<section><h2>What was run</h2>
+<table><tbody>
+<tr><th>Batch root</th><td><code>artifacts/batches/swe_lme_real_vs_grep_250/20260518-173038</code></td></tr>
+<tr><th>Total runs</th><td>250 = 125 tasks × 2 arms</td></tr>
+<tr><th>Arms</th><td><code>full_context</code>: source text in one prompt, no search tools<br><code>grep_file</code>: source saved in <code>full_context.txt</code>, agent may search the file</td></tr>
+<tr><th>Compaction</th><td><strong>0 compaction events</strong>; this is not the compacted-agent-memory condition.</td></tr>
+<tr><th>Important caveat</th><td>LongMemEval uses <strong>rendered/clipped browser trajectories</strong>, not raw lossless trajectory JSON.</td></tr>
+<tr><th>Pass@2?</th><td>No. This batch is one completion per arm. It is a paired two-arm comparison, not pass@2.</td></tr>
+</tbody></table></section>
+
+<section><h2>Top-line exact scoring</h2>
+<div class="grid two">
+<div class="card"><h3>Full context</h3><div class="metric blue">8/125</div><p>6.4% exact accuracy</p><p class="muted">parse ok 86/125</p></div>
+<div class="card"><h3>File search</h3><div class="metric green">12/125</div><p>9.6% exact accuracy</p><p class="muted">parse ok 125/125</p></div>
+</div>
+<table><thead><tr><th>Dataset</th><th>Full context</th><th>File search</th><th>Plain-English read</th></tr></thead><tbody>
+<tr><td>LongMemEval rendered</td><td>8/75 (10.7%)</td><td>12/75 (16.0%)</td><td>Search modestly helped, especially procedure-style questions.</td></tr>
+<tr><td>SWE-chat</td><td>0/50</td><td>0/50</td><td>Exact match is not meaningful for long coding replies.</td></tr>
+</tbody></table></section>
+
+<section><h2>SWE-chat needs semantic/judge scoring</h2>
+<p>SWE-chat gold answers are long assistant replies from real coding sessions. A substring/exact scorer says 0/50 for both arms, but that does not mean both arms were useless.</p>
+<table><thead><tr><th>Arm</th><th>Parsed answers</th><th>Avg rough semantic score</th><th>Median</th><th>≥ 0.20</th><th>≥ 0.30</th></tr></thead><tbody>
+<tr><td>Full context</td><td>38/50</td><td>0.196</td><td>0.200</td><td>19</td><td>3</td></tr>
+<tr><td>File search</td><td>50/50</td><td>0.139</td><td>0.129</td><td>12</td><td>2</td></tr>
+</tbody></table>
+<p class="quote">Early signal: full context looks better on rough semantic overlap. Final claim should wait for an LLM judge.</p>
+</section>
+
+<section><h2>LongMemEval examples</h2>
+<h3>Where file search helped</h3>
+<table><thead><tr><th>Question</th><th>Gold</th><th>Full context answer</th><th>File search answer</th></tr></thead><tbody>
+<tr><td><br><span class='muted'>lme_dynamic-environment</span><br>I am working with our ServiceNow portal. In the Service Catalog, after submitting a Loaner Laptop order and reaching the Order Status page, what value is shown in the right-side Total box? Select ONE.  A. $0.00 B. empty C. - D. the full purchase price of the …</td><td>C</td><td></td><td>\boxed{C}</td></tr>
+<tr><td><br><span class='muted'>lme_errors-gotchas</span><br>I am working in our ServiceNow portal. My manager asked me to retrieve information from the chart with title #CAT001314192, but I searched for the chart ID in global search and Dashboards Overview and got no results. The screenshot shows where I searched. Wha…</td><td>reports</td><td></td><td>Use the `Reports &gt; View/Run` module.</td></tr>
+<tr><td>lme-procedure-07ffeedf<br><span class='muted'>lme_procedure</span><br>I am working with our ServiceNow portal. For the task of navigating and creating problem requests from incident-report results, which option contains only fields that are both (i) present on the Problem table in this environment and (ii) unimportant in our ty…</td><td>G</td><td>\boxed{C}</td><td>\boxed{G}</td></tr>
+<tr><td><br><span class='muted'>lme_procedure</span><br>I am working with our ServiceNow portal. For the task of filtering and removing duplicated problems, which fields are the most important in our typical workflow?  A. Category, Related incidents B. Ownership, Category, Impact, Related incidents C. Priority, Im…</td><td>D</td><td></td><td>\boxed{G}</td></tr>
+</tbody></table><h3>Where full context helped</h3><table><thead><tr><th>Task</th><th>Gold</th><th>Full context</th><th>File search</th></tr></thead><tbody>
+<tr><td>lme-static-environment-229675cd<br><span class='muted'>lme_static-environment</span></td><td>Resolve</td><td>Resolve</td><td>\boxed{Create Change Request}</td></tr>
+</tbody></table></section>
+<section><h2>SWE-chat semantic examples</h2><div class='grid two'>
+<div class='card'><h3>Full context: high rough-semantic examples</h3><p><strong>score 0.375</strong> — <code>swe-chat-019d652e-bb47-7590-96f1-e572569920a8-turn0241</code></p><p class='muted'>Gold: I’m reading the newest leader mailbox and live task state again now. Since the branch was previously red, I’ll focus on whether worker-1 has begun shared-core reconciliation and whether worker-4 responded with exact bui…</p><p>Answer: I’m reading the latest mailbox and live team state now. The team is still active and the leader branch is still unstable, so I’m not shutting it down yet; I’m keeping worker-1 on shared-core reconciliation and worker-4 …</p><p><strong>score 0.353</strong> — <code>swe-chat-ses_336ebe11bffePlPIwBobiYzDoC-turn0055</code></p><p class='muted'>Gold: Summary of the reviewer output: - It found one **high-severity** bug: file APIs could be escaped via symlinks (lexical path validation blocked `..`, but symlink resolution could still point outside `/workspace`).  I fix…</p><p>Answer: Reviewer reported a high-severity parser bug in `parseDiffNameStatus`: it was still handling `git diff --name-status -z` incorrectly, which caused empty or wrong `changedFiles` metadata and inconsistent diff responses. …</p></div><div class='card'><h3>File search: high rough-semantic examples</h3><p><strong>score 0.479</strong> — <code>swe-chat-ses_316c7f4fdffet0JWKRHKWRLEE4-turn0083</code></p><p class='muted'>Gold: Yep — you’re right, and I believe you.   This is likely terminal auto-substitution (smart punctuation) happening outside your intent.  Fastest safe workaround: put the SQL in a file so shell quoting can’t mutate it.  Ru…</p><p>Answer: You’re still getting bitten by smart quotes at the end (`…&#x27;;”`), so the SQL is malformed/treated oddly.  Also, Wrangler prints only “Executed 1 command” when a query returns zero rows, so we need explicit count checks. …</p><p><strong>score 0.356</strong> — <code>swe-chat-ses_30dbba977ffeu4THW7jaQn7dZk-turn0063</code></p><p class='muted'>Gold: Yes — exactly.  Because I made the commit from this agent shell, it didn’t pick up your active Entire session context, so no trailer was attached.   If you do the commit from your terminal session, it’s much more likely…</p><p>Answer: Yes. The file says the root issue was that my commit was created outside your active Entire session context, so it did not get an `Entire-Checkpoint` trailer. It also says the best prevention is for you to run the final…</p></div></div></section>
+
+<section><h2>Slack-ready summary</h2>
+<pre>Ran 250 real-data comparisons on SWE-chat + LongMemEval rendered.
+- LongMemEval rendered: grep/file search 12/75 vs full context 8/75 exact.
+- SWE-chat: exact scoring is invalid for long coding replies; both show 0/50 exact.
+- Rough semantic SWE-chat signal: full context avg 0.196, grep avg 0.139.
+- Caveats: LME is rendered/clipped browser context, not raw lossless JSON. This is not pass@2; one completion per arm.</pre>
+</section>
+
+<section><h2>Files</h2>
+<table><tbody>
+<tr><th>HTML</th><td><code>docs/swe_lme_real_vs_grep_250_report.html</code></td></tr>
+<tr><th>Markdown</th><td><code>artifacts/batches/swe_lme_real_vs_grep_250/20260518-173038/analysis/report.md</code></td></tr>
+<tr><th>Rows</th><td><code>artifacts/batches/swe_lme_real_vs_grep_250/20260518-173038/analysis/rows.csv</code></td></tr>
+<tr><th>Summary</th><td><code>artifacts/batches/swe_lme_real_vs_grep_250/20260518-173038/analysis/summary.json</code></td></tr>
+</tbody></table></section>
+</main></body></html>
