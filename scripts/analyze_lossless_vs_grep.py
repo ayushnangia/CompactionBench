@@ -108,8 +108,14 @@ def main() -> int:
             arm = str(rec.metadata.get("arm") or "unknown")
             original_task_id = str(rec.metadata.get("original_task_id") or rec.task_id)
             answer = rec.final_answer_parsed.answer if rec.final_answer_parsed else None
-            memory_meta = rec.metadata.get("hierarchical_memory") or rec.metadata.get("virtual_context") or {}
-            evidence_tokens = int(memory_meta.get("evidence_tokens_est") or memory_meta.get("notes_tokens_est") or 0) if isinstance(memory_meta, dict) else 0
+            memory_meta = rec.metadata.get("hierarchical_memory") or rec.metadata.get("virtual_context") or rec.metadata.get("bidirectional_proof") or {}
+            evidence_tokens = int(
+                memory_meta.get("evidence_tokens_est")
+                or memory_meta.get("notes_tokens_est")
+                or memory_meta.get("proof_json_tokens_est")
+                or memory_meta.get("proof_md_tokens_est")
+                or 0
+            ) if isinstance(memory_meta, dict) else 0
             score = score_value_one(scorer=rec.scorer, gold=rec.gold_answer, gold_aliases=rec.gold_answer_aliases, answer=answer)
             relaxed_score = relaxed_score_value(scorer=rec.scorer, gold=rec.gold_answer, gold_aliases=rec.gold_answer_aliases, answer=answer)
             rows.append(

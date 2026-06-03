@@ -14,6 +14,7 @@ For each input task, this creates two runs:
 - virtual_context_rlm: transparent RLM/RM3-style pseudo-relevance-feedback retrieval. (Deprecated: not Recursive Language Models.)
 - flat_memory_packet: equal-budget flat raw-event retrieval packet with no hierarchy/consolidation.
 - rlm_repl_depth0: Recursive Language Model style REPL/code scaffold with context externalized; no sub-LM calls.
+- bidirectional_proof: generic model-driven query-contract/proof induction over context.txt with cited proof packet; no benchmark-specific semantic hints.
 
 Prompts are passed on stdin to avoid OS command-line length limits.
 """
@@ -68,6 +69,7 @@ Arm = Literal[
     "hierarchy_oracle",
     "flat_memory_packet",
     "babilong_state_packet",
+    "bidirectional_proof",
     "rlm_repl_depth0",
 ]
 
@@ -108,7 +110,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max-workers", type=int, default=8)
     p.add_argument(
         "--arm",
-        choices=["full_context", "grep_file", "paged_context", "virtual_context", "virtual_context_8k", "virtual_context_24k", "virtual_context_48k", "virtual_context_rlm", "raw_snippets_prompt", "raw_snippets_file", "structured_notes_prompt", "structured_notes_file", "cli_notes_same_session", "cli_notes_two_stage", "hierarchy_packet", "hierarchy_oracle", "flat_memory_packet", "babilong_state_packet", "rlm_repl_depth0"],
+        choices=["full_context", "grep_file", "paged_context", "virtual_context", "virtual_context_8k", "virtual_context_24k", "virtual_context_48k", "virtual_context_rlm", "raw_snippets_prompt", "raw_snippets_file", "structured_notes_prompt", "structured_notes_file", "cli_notes_same_session", "cli_notes_two_stage", "hierarchy_packet", "hierarchy_oracle", "flat_memory_packet", "babilong_state_packet", "bidirectional_proof", "rlm_repl_depth0"],
         action="append",
         default=None,
         help="Optional arm allowlist; default runs full_context and grep_file.",
@@ -327,6 +329,7 @@ def run_one(job: Job, task: TaskRow, *, run_task_id: str, log_path: Path) -> Run
     virtual_context_metadata: dict[str, Any] | None = None
     cli_notes_metadata: dict[str, Any] | None = None
     hierarchical_memory_metadata: dict[str, Any] | None = None
+    bidirectional_proof_metadata: dict[str, Any] | None = None
 
     session_id = ""
     final_raw: str | None = None
@@ -340,6 +343,9 @@ def run_one(job: Job, task: TaskRow, *, run_task_id: str, log_path: Path) -> Run
         cwd = Path(tmpdir)
         if job.arm == "grep_file":
             (cwd / "full_context.txt").write_text(task.context)
+        elif job.arm == "bidirectional_proof":
+            (cwd / "context.txt").write_text(task.context)
+            prompt = build_bidirectional_proof_prompt(task)
         elif job.arm == "cli_notes_same_session":
             (cwd / "full_context.txt").write_text(task.context)
             prompt = build_cli_notes_same_session_prompt(task)
@@ -540,6 +546,8 @@ def run_one(job: Job, task: TaskRow, *, run_task_id: str, log_path: Path) -> Run
 
         if job.arm == "cli_notes_same_session":
             cli_notes_metadata = read_notes_metadata(cwd / "notes.md")
+        if job.arm == "bidirectional_proof":
+            bidirectional_proof_metadata = read_bidirectional_proof_metadata(cwd, context=task.context)
 
     if not session_id:
         session_id = f"error-{job.index}-{job.arm}-{safe_name(task.task_id)[:40]}"
@@ -574,6 +582,7 @@ def run_one(job: Job, task: TaskRow, *, run_task_id: str, log_path: Path) -> Run
             "virtual_context": virtual_context_metadata,
             "cli_notes": cli_notes_metadata,
             "hierarchical_memory": hierarchical_memory_metadata,
+            "bidirectional_proof": bidirectional_proof_metadata,
             "rlm": {
                 "mode": "repl_depth0",
                 "context_file": "context.txt",
@@ -863,7 +872,7 @@ def read_notes_metadata(path: Path) -> dict[str, Any]:
 
 
 def codex_args(job: Job, cwd: Path, *, sandbox: str | None = None) -> list[str]:
-    sandbox = sandbox or ("workspace-write" if job.arm in {"cli_notes_same_session", "cli_notes_two_stage"} else "read-only")
+    sandbox = sandbox or ("workspace-write" if job.arm in {"cli_notes_same_session", "cli_notes_two_stage", "bidirectional_proof"} else "read-only")
     return [
         CODEX_BIN,
         "-m",
@@ -1021,6 +1030,106 @@ def build_notes_file_prompt(
         f"{benchmark_hint(source_benchmark, source_task)}\n"
         f"Question:\n{question}\n"
     )
+
+
+def build_bidirectional_proof_prompt(task: TaskRow) -> str:
+    """Generic proof-induction prompt with no benchmark-specific semantic categories."""
+
+    return (
+        "You are running the BIDIRECTIONAL PROOF MEMORY arm.\n"
+        "The full source is saved in ./context.txt. Do not use the web.\n"
+        "No domain or benchmark categories are provided. Do not assume any fixed ontology.\n"
+        "Induce the temporary schema/contract needed for this question only from the question and the source evidence you inspect.\n"
+        "Work as a meet-in-the-middle proof search:\n"
+        "1. Write a task-local query contract: expected answer shape, variables, constraints, and what kind of evidence would prove it.\n"
+        "2. Search ./context.txt using shell/python as needed.\n"
+        "3. From the context side, discover cited evidence handles: exact quotes/spans that may support or refute candidate answers.\n"
+        "4. Build a minimal proof path from the query contract to the evidence. Check for contradictory or newer/refuting evidence if relevant.\n"
+        "5. Write ./proof_packet.json. Use only generic fields; do not rely on predefined semantic categories.\n"
+        "The proof packet should be a JSON object with keys like query_contract, induced_schema, search_trace, claims, proof_steps, contradiction_checks, answer.\n"
+        "Every claim should include an exact source_quote copied from context.txt when possible.\n"
+        "After writing proof_packet.json, return exactly one JSON object with one field: {\"answer\": \"...\"}. Do not include extra text.\n"
+        "If evidence is insufficient, answer unknown.\n"
+        f"Question:\n{task.question}\n"
+    )
+
+
+def read_bidirectional_proof_metadata(cwd: Path, *, context: str) -> dict[str, Any]:
+    json_path = cwd / "proof_packet.json"
+    md_path = cwd / "proof_packet.md"
+    metadata: dict[str, Any] = {
+        "proof_json_exists": json_path.exists(),
+        "proof_md_exists": md_path.exists(),
+    }
+    packet: Any = None
+    if json_path.exists():
+        text = json_path.read_text(errors="replace")
+        metadata.update(
+            {
+                "proof_json_chars": len(text),
+                "proof_json_tokens_est": estimate_tokens(text),
+                "proof_json_preview": preview(text, 700),
+            }
+        )
+        try:
+            packet = json.loads(text)
+            metadata["proof_json_parse_ok"] = True
+        except Exception as e:
+            metadata["proof_json_parse_ok"] = False
+            metadata["proof_json_error"] = f"{type(e).__name__}: {e}"
+    else:
+        metadata["proof_json_parse_ok"] = False
+    if md_path.exists():
+        md_text = md_path.read_text(errors="replace")
+        metadata.update(
+            {
+                "proof_md_chars": len(md_text),
+                "proof_md_tokens_est": estimate_tokens(md_text),
+                "proof_md_preview": preview(md_text, 700),
+            }
+        )
+    quotes = _extract_generic_source_quotes(packet)
+    checked = []
+    for quote in quotes[:80]:
+        normalized = " ".join(quote.split())
+        checked.append(
+            {
+                "quote_preview": preview(normalized, 180),
+                "chars": len(quote),
+                "present_exact": quote in context,
+                "present_normalized": normalized in " ".join(context.split()),
+            }
+        )
+    metadata["source_quote_count"] = len(quotes)
+    metadata["source_quotes_checked"] = checked
+    metadata["source_quotes_present_exact"] = sum(1 for item in checked if item["present_exact"])
+    metadata["source_quotes_present_normalized"] = sum(1 for item in checked if item["present_normalized"])
+    return metadata
+
+
+def _extract_generic_source_quotes(value: Any) -> list[str]:
+    quotes: list[str] = []
+    quote_key_re = re.compile(r"(^|_)(source_)?quote(s)?$|citation|evidence", re.IGNORECASE)
+
+    def walk(node: Any, *, key_hint: str = "") -> None:
+        if isinstance(node, dict):
+            for key, child in node.items():
+                walk(child, key_hint=str(key))
+        elif isinstance(node, list):
+            for child in node:
+                walk(child, key_hint=key_hint)
+        elif isinstance(node, str):
+            if quote_key_re.search(key_hint) and 8 <= len(node.strip()) <= 2000:
+                quotes.append(node.strip())
+
+    walk(value)
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for quote in quotes:
+        if quote not in seen:
+            seen.add(quote)
+            deduped.append(quote)
+    return deduped
 
 
 def build_cli_notes_same_session_prompt(task: TaskRow) -> str:
