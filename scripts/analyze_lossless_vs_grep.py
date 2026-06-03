@@ -109,14 +109,23 @@ def main() -> int:
             original_task_id = str(rec.metadata.get("original_task_id") or rec.task_id)
             answer = rec.final_answer_parsed.answer if rec.final_answer_parsed else None
             memory_meta = rec.metadata.get("hierarchical_memory") or rec.metadata.get("virtual_context") or rec.metadata.get("bidirectional_proof") or {}
-            evidence_tokens = int(
-                memory_meta.get("evidence_tokens_est")
-                or memory_meta.get("notes_tokens_est")
-                or memory_meta.get("proof_json_tokens_est")
-                or memory_meta.get("proof_audit_tokens_est")
-                or memory_meta.get("proof_md_tokens_est")
-                or 0
-            ) if isinstance(memory_meta, dict) else 0
+            if isinstance(memory_meta, dict) and rec.metadata.get("bidirectional_proof"):
+                evidence_tokens = sum(
+                    int(memory_meta.get(key) or 0)
+                    for key in (
+                        "proof_json_tokens_est",
+                        "proof_audit_tokens_est",
+                        "proof_packet_repaired_tokens_est",
+                        "proof_repair_audit_tokens_est",
+                        "proof_md_tokens_est",
+                    )
+                )
+            else:
+                evidence_tokens = int(
+                    memory_meta.get("evidence_tokens_est")
+                    or memory_meta.get("notes_tokens_est")
+                    or 0
+                ) if isinstance(memory_meta, dict) else 0
             score = score_value_one(scorer=rec.scorer, gold=rec.gold_answer, gold_aliases=rec.gold_answer_aliases, answer=answer)
             relaxed_score = relaxed_score_value(scorer=rec.scorer, gold=rec.gold_answer, gold_aliases=rec.gold_answer_aliases, answer=answer)
             rows.append(

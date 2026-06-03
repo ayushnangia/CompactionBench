@@ -15,6 +15,7 @@ For each input task, this creates two runs:
 - flat_memory_packet: equal-budget flat raw-event retrieval packet with no hierarchy/consolidation.
 - rlm_repl_depth0: Recursive Language Model style REPL/code scaffold with context externalized; no sub-LM calls.
 - bidirectional_proof: generic model-driven query-contract/proof induction over context.txt with cited proof packet; no benchmark-specific semantic hints.
+- bidirectional_proof_repair: same generic proof induction plus an independent model-driven verifier/repair pass; no benchmark-specific semantic hints.
 
 Prompts are passed on stdin to avoid OS command-line length limits.
 """
@@ -70,6 +71,7 @@ Arm = Literal[
     "flat_memory_packet",
     "babilong_state_packet",
     "bidirectional_proof",
+    "bidirectional_proof_repair",
     "rlm_repl_depth0",
 ]
 
@@ -110,7 +112,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max-workers", type=int, default=8)
     p.add_argument(
         "--arm",
-        choices=["full_context", "grep_file", "paged_context", "virtual_context", "virtual_context_8k", "virtual_context_24k", "virtual_context_48k", "virtual_context_rlm", "raw_snippets_prompt", "raw_snippets_file", "structured_notes_prompt", "structured_notes_file", "cli_notes_same_session", "cli_notes_two_stage", "hierarchy_packet", "hierarchy_oracle", "flat_memory_packet", "babilong_state_packet", "bidirectional_proof", "rlm_repl_depth0"],
+        choices=["full_context", "grep_file", "paged_context", "virtual_context", "virtual_context_8k", "virtual_context_24k", "virtual_context_48k", "virtual_context_rlm", "raw_snippets_prompt", "raw_snippets_file", "structured_notes_prompt", "structured_notes_file", "cli_notes_same_session", "cli_notes_two_stage", "hierarchy_packet", "hierarchy_oracle", "flat_memory_packet", "babilong_state_packet", "bidirectional_proof", "bidirectional_proof_repair", "rlm_repl_depth0"],
         action="append",
         default=None,
         help="Optional arm allowlist; default runs full_context and grep_file.",
@@ -343,7 +345,7 @@ def run_one(job: Job, task: TaskRow, *, run_task_id: str, log_path: Path) -> Run
         cwd = Path(tmpdir)
         if job.arm == "grep_file":
             (cwd / "full_context.txt").write_text(task.context)
-        elif job.arm == "bidirectional_proof":
+        elif job.arm in {"bidirectional_proof", "bidirectional_proof_repair"}:
             (cwd / "context.txt").write_text(task.context)
             prompt = build_bidirectional_proof_prompt(task)
         elif job.arm == "cli_notes_same_session":
@@ -540,13 +542,53 @@ def run_one(job: Job, task: TaskRow, *, run_task_id: str, log_path: Path) -> Run
                         parse_ok = True
                     except Exception:
                         parse_ok = False
+                    if job.arm == "bidirectional_proof_repair":
+                        repair_prompt = build_bidirectional_repair_prompt(task)
+                        turns.append(
+                            TurnTrace(
+                                index=len(turns) + 1,
+                                role="user",
+                                kind="final_question",
+                                chars=len(repair_prompt),
+                                tokens_est=estimate_tokens(repair_prompt),
+                                content_preview=preview(repair_prompt),
+                            )
+                        )
+                        repair_args = codex_args(job, cwd)
+                        log.write("\nREPAIR_CMD=" + json.dumps(repair_args) + "\n")
+                        repair_proc = subprocess.run(
+                            repair_args,
+                            input=repair_prompt,
+                            capture_output=True,
+                            text=True,
+                            timeout=job.timeout_s,
+                            check=False,
+                        )
+                        log.write("repair_returncode=" + str(repair_proc.returncode) + "\n")
+                        if repair_proc.stderr:
+                            log.write("\nREPAIR_STDERR_TAIL:\n" + repair_proc.stderr[-4000:] + "\n")
+                        if repair_proc.stdout:
+                            log.write("\nREPAIR_STDOUT_TAIL:\n" + repair_proc.stdout[-8000:] + "\n")
+                        if repair_proc.returncode != 0:
+                            error = f"repair codex exited {repair_proc.returncode}: stderr_tail={repair_proc.stderr[-500:]} stdout_tail={repair_proc.stdout[-300:]}"
+                        else:
+                            repair_result = parse_codex_jsonl(repair_proc.stdout, condition="off")
+                            session_id = repair_result.session_id or session_id
+                            final_raw = repair_result.text
+                            tool_events.extend(repair_result.tool_events)
+                            compaction_events.extend(repair_result.compaction_events)
+                            try:
+                                parsed = parse_agent_answer(final_raw)
+                                parse_ok = True
+                            except Exception:
+                                parse_ok = False
             except Exception as e:
                 error = f"{type(e).__name__}: {e}"
                 log.write("\nEXCEPTION=" + error + "\n")
 
         if job.arm == "cli_notes_same_session":
             cli_notes_metadata = read_notes_metadata(cwd / "notes.md")
-        if job.arm == "bidirectional_proof":
+        if job.arm in {"bidirectional_proof", "bidirectional_proof_repair"}:
             bidirectional_proof_metadata = read_bidirectional_proof_metadata(cwd, context=task.context)
 
     if not session_id:
@@ -556,7 +598,7 @@ def run_one(job: Job, task: TaskRow, *, run_task_id: str, log_path: Path) -> Run
 
     turns.append(
         TurnTrace(
-            index=2,
+            index=len(turns) + 1,
             role="assistant",
             kind="final_question",
             chars=len(final_raw or ""),
@@ -872,7 +914,7 @@ def read_notes_metadata(path: Path) -> dict[str, Any]:
 
 
 def codex_args(job: Job, cwd: Path, *, sandbox: str | None = None) -> list[str]:
-    sandbox = sandbox or ("workspace-write" if job.arm in {"cli_notes_same_session", "cli_notes_two_stage", "bidirectional_proof"} else "read-only")
+    sandbox = sandbox or ("workspace-write" if job.arm in {"cli_notes_same_session", "cli_notes_two_stage", "bidirectional_proof", "bidirectional_proof_repair"} else "read-only")
     return [
         CODEX_BIN,
         "-m",
@@ -1055,13 +1097,32 @@ def build_bidirectional_proof_prompt(task: TaskRow) -> str:
     )
 
 
+def build_bidirectional_repair_prompt(task: TaskRow) -> str:
+    return (
+        "You are the independent verifier/repair pass for the BIDIRECTIONAL PROOF MEMORY arm.\n"
+        "The full source is in ./context.txt. The first-pass proof files, if present, are ./proof_packet.json and ./proof_audit.json.\n"
+        "Do not use the web. Do not assume benchmark/domain categories or fixed ontology.\n"
+        "Your job is generic proof repair:\n"
+        "1. Read the first-pass proof and audit. Identify unsupported claims, sampled evidence passed off as exhaustive evidence, arithmetic/counting errors, and answer-format risks.\n"
+        "2. Re-search ./context.txt and rerun source-derived scripts as needed. For totals/frequencies/order/extrema, prefer exhaustive scripts over snippets.\n"
+        "3. If the first answer is wrong or unsupported, repair it. If no proof is possible, answer unknown.\n"
+        "4. Write ./proof_packet_repaired.json and ./proof_repair_audit.json using generic fields only. Include commands/scripts, evidence coverage, source_quote fields when available, and unresolved risks.\n"
+        "5. Return exactly one JSON object with one field: {\"answer\": \"...\"}. Do not include extra text.\n"
+        f"Question:\n{task.question}\n"
+    )
+
+
 def read_bidirectional_proof_metadata(cwd: Path, *, context: str) -> dict[str, Any]:
     json_path = cwd / "proof_packet.json"
     audit_path = cwd / "proof_audit.json"
+    repaired_path = cwd / "proof_packet_repaired.json"
+    repair_audit_path = cwd / "proof_repair_audit.json"
     md_path = cwd / "proof_packet.md"
     metadata: dict[str, Any] = {
         "proof_json_exists": json_path.exists(),
         "proof_audit_exists": audit_path.exists(),
+        "proof_packet_repaired_exists": repaired_path.exists(),
+        "proof_repair_audit_exists": repair_audit_path.exists(),
         "proof_md_exists": md_path.exists(),
     }
     packet: Any = None
@@ -1100,6 +1161,42 @@ def read_bidirectional_proof_metadata(cwd: Path, *, context: str) -> dict[str, A
             metadata["proof_audit_error"] = f"{type(e).__name__}: {e}"
     else:
         metadata["proof_audit_parse_ok"] = False
+    repaired: Any = None
+    if repaired_path.exists():
+        repaired_text = repaired_path.read_text(errors="replace")
+        metadata.update(
+            {
+                "proof_packet_repaired_chars": len(repaired_text),
+                "proof_packet_repaired_tokens_est": estimate_tokens(repaired_text),
+                "proof_packet_repaired_preview": preview(repaired_text, 700),
+            }
+        )
+        try:
+            repaired = json.loads(repaired_text)
+            metadata["proof_packet_repaired_parse_ok"] = True
+        except Exception as e:
+            metadata["proof_packet_repaired_parse_ok"] = False
+            metadata["proof_packet_repaired_error"] = f"{type(e).__name__}: {e}"
+    else:
+        metadata["proof_packet_repaired_parse_ok"] = False
+    repair_audit: Any = None
+    if repair_audit_path.exists():
+        repair_audit_text = repair_audit_path.read_text(errors="replace")
+        metadata.update(
+            {
+                "proof_repair_audit_chars": len(repair_audit_text),
+                "proof_repair_audit_tokens_est": estimate_tokens(repair_audit_text),
+                "proof_repair_audit_preview": preview(repair_audit_text, 700),
+            }
+        )
+        try:
+            repair_audit = json.loads(repair_audit_text)
+            metadata["proof_repair_audit_parse_ok"] = True
+        except Exception as e:
+            metadata["proof_repair_audit_parse_ok"] = False
+            metadata["proof_repair_audit_error"] = f"{type(e).__name__}: {e}"
+    else:
+        metadata["proof_repair_audit_parse_ok"] = False
     if md_path.exists():
         md_text = md_path.read_text(errors="replace")
         metadata.update(
@@ -1109,7 +1206,7 @@ def read_bidirectional_proof_metadata(cwd: Path, *, context: str) -> dict[str, A
                 "proof_md_preview": preview(md_text, 700),
             }
         )
-    quotes = _extract_generic_source_quotes(packet) + _extract_generic_source_quotes(audit)
+    quotes = _extract_generic_source_quotes(packet) + _extract_generic_source_quotes(audit) + _extract_generic_source_quotes(repaired) + _extract_generic_source_quotes(repair_audit)
     checked = []
     for quote in quotes[:80]:
         normalized = " ".join(quote.split())

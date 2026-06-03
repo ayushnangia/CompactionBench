@@ -119,6 +119,40 @@ This is a useful negative/diagnostic result. It says the next step is not to add
 - generic decomposition into subquestions,
 - better deterministic checking of computations and quote provenance.
 
+## Iteration 3: independent proof-repair pass
+
+Added a separate arm:
+
+- `bidirectional_proof_repair`
+
+It runs the same generic first-pass proof induction, then launches a second independent verifier/repair model call. The repair pass reads:
+
+- `context.txt`
+- `proof_packet.json`
+- `proof_audit.json`
+
+and writes:
+
+- `proof_packet_repaired.json`
+- `proof_repair_audit.json`
+
+The repair prompt is still generic: no benchmark/domain categories, no OOLONG/BABILong/etc. labels.
+
+Repair canary on the three OOLONG-real cumulative count tasks:
+
+- `artifacts/batches/generic_bidirectional_oolong_repair_real3`
+- `artifacts/analysis/generic_bidirectional_oolong_repair_real3/report.md`
+
+| Arm | Strict | Avg tools | Avg evidence | Avg duration |
+|---|---:|---:|---:|---:|
+| `bidirectional_proof_repair` | 0/3 | 19.67 | 1476 tok | 133.0s |
+
+The repair pass still failed all three real OOLONG roll/spell cumulative count tasks. It also became much more expensive.
+
 ## Current caveat
 
-This arm is generic but model-call/tool heavy. In v2 it uses ~10 tool calls/run on OOLONG and is slower than grep. It should not be compared as a cheap no-tool memory packet yet.
+This arm is generic but model-call/tool heavy. In v2 it uses ~10 tool calls/run on OOLONG and the repair arm uses ~20 tool calls/run on real OOLONG counting tasks. It should not be compared as a cheap no-tool memory packet yet.
+
+## Current conclusion
+
+No semantic hardcoding is scientifically cleaner, but the current generic model-driven proof-search approach is not enough for real OOLONG cumulative counting. The next improvement should be generic tool scaffolding/checking, not benchmark categories: e.g. reusable source segmentation, line-span accounting, independent count reconciliation, and proof repair based on failed generic invariants.
